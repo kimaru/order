@@ -6,112 +6,188 @@
   <title>Your Digital Store</title>
   <style>
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f0f2f5;
-      color: #222;
+      background-color: #f7f9fa;
+      color: #1a1a1a;
+      -webkit-font-smoothing: antialiased;
     }
     .header {
-      background-color: #075E54;
+      background: linear-gradient(135deg, #075E54 0%, #128C7E 100%);
       color: white;
-      padding: 20px;
+      padding: 35px 20px;
       text-align: center;
+      border-bottom-left-radius: 24px;
+      border-bottom-right-radius: 24px;
+      box-shadow: 0 4px 20px rgba(7, 94, 84, 0.12);
+    }
+    .header h2 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .header p {
+      margin: 8px 0 0 0;
+      font-size: 13px;
+      opacity: 0.9;
+      font-weight: 400;
+      line-height: 1.4;
     }
     .container {
       max-width: 500px;
       margin: 0 auto;
-      padding: 15px;
-      padding-bottom: 100px;
+      padding: 24px 16px;
+      padding-bottom: 120px;
+      box-sizing: border-box;
     }
     .product-card {
       background: white;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
+      border-radius: 16px;
+      padding: 16px;
+      margin-bottom: 14px;
       display: flex;
       align-items: center;
-      gap: 15px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      gap: 16px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+      border: 1px solid #edf0f2;
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .product-card:active {
+      transform: scale(0.98);
     }
     .product-thumb {
-      width: 75px;
-      height: 75px;
+      width: 84px;
+      height: 84px;
       object-fit: cover;
-      border-radius: 6px;
-      background: #f0f0f0;
+      border-radius: 12px;
+      background: #f5f6f7;
       flex-shrink: 0;
+      border: 1px solid #eef0f1;
     }
     .product-info {
       flex-grow: 1;
     }
-    .product-info h3 { margin: 0 0 4px 0; font-size: 15px; font-weight: 600; }
-    .product-info p { margin: 0; color: #075E54; font-weight: bold; font-size: 14px; }
+    .product-info h3 {
+      margin: 0 0 6px 0;
+      font-size: 16px;
+      font-weight: 600;
+      color: #1e293b;
+      line-height: 1.4;
+    }
+    .product-info p {
+      margin: 0;
+      color: #075E54;
+      font-weight: 700;
+      font-size: 17px;
+    }
     .quantity-controls {
       display: flex;
       align-items: center;
-      gap: 10px;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 30px;
+      gap: 4px;
     }
     .btn-qty {
-      background-color: #25D366;
-      color: white;
+      background-color: white;
+      color: #0f172a;
       border: none;
-      width: 30px;
-      height: 30px;
+      width: 32px;
+      height: 32px;
       border-radius: 50%;
       font-size: 16px;
-      font-weight: bold;
+      font-weight: 600;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      transition: background-color 0.1s;
     }
-    .qty-display { font-weight: bold; min-width: 15px; text-align: center; }
+    .btn-qty:active {
+      background-color: #e2e8f0;
+    }
+    .qty-display {
+      font-weight: 700;
+      min-width: 28px;
+      text-align: center;
+      font-size: 14px;
+      color: #0f172a;
+    }
     .cart-bar {
       position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: white;
-      box-shadow: 0 -3px 10px rgba(0,0,0,0.1);
-      padding: 15px;
+      bottom: 20px;
+      left: 16px;
+      right: 16px;
+      background: rgba(255, 255, 255, 0.9);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      padding: 16px 20px;
+      border-radius: 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      max-width: 500px;
+      max-width: 468px;
       margin: 0 auto;
+      box-sizing: border-box;
+      border: 1px solid rgba(255,255,255,0.7);
     }
-    .total-price { font-size: 18px; font-weight: bold; }
+    .total-price {
+      font-size: 13px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .total-price span {
+      display: block;
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 2px;
+      text-transform: none;
+      letter-spacing: -0.5px;
+    }
     .checkout-btn {
-      background-color: #25D366;
+      background: linear-gradient(135deg, #25D366 0%, #1ecc5b 100%);
       color: white;
       border: none;
-      padding: 12px 24px;
-      border-radius: 25px;
-      font-weight: bold;
+      padding: 16px 28px;
+      border-radius: 14px;
+      font-weight: 700;
       font-size: 15px;
       cursor: pointer;
+      box-shadow: 0 4px 14px rgba(37, 211, 102, 0.3);
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .checkout-btn:active {
+      transform: scale(0.96);
     }
   </style>
 </head>
 <body>
 
   <div class="header">
-    <h2 style="margin:0;">🛒 Mobile Order Form</h2>
-    <p style="margin:5px 0 0 0; opacity:0.8;">Select your items and send order to WhatsApp</p>
+    <h2>🛒 Mobile Order Form</h2>
+    <p>Select your items and place your order instantly via WhatsApp</p>
   </div>
 
   <div class="container" id="products-list">
-    <p style="text-align:center; color:#666;">Loading store data...</p>
+    <p style="text-align:center; color:#64748b; margin-top: 40px; font-size: 14px;">Loading store catalog...</p>
   </div>
 
   <div class="cart-bar">
-    <div class="total-price">Total: <span id="grand-total">0.00</span></div>
+    <div class="total-price">Total Amount<span><span style="display:inline;" id="grand-total">0.00</span></span></div>
     <button class="checkout-btn" id="whatsapp-submit">Order via WhatsApp 💬</button>
   </div>
 
   <script type="text/javascript">
     (function() {
-      // Linked to your specific firebase project space
       const PROJECT_ID = "whatsapp-eco-engine-80882";
-      const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes client-side cost guard
+      const CACHE_DURATION_MS = 10 * 60 * 1000;
 
       let storeData = { phone: "", items: [] };
       let quantities = {};
@@ -120,7 +196,7 @@
       const storeId = urlParams.get('id');
 
       if (!storeId) {
-        document.getElementById('products-list').innerHTML = "<p style='text-align:center;'>Error: No Store ID provided in URL.</p>";
+        document.getElementById('products-list').innerHTML = "<p style='text-align:center; color:#ef4444; margin-top:40px; font-weight:600;'>Error: No Store ID found in link.</p>";
         return;
       }
 
@@ -131,13 +207,10 @@
       const cachedTime = localStorage.getItem(cacheTimeKey);
       const now = Date.now();
 
-      // Check optimization memory cache layer first
       if (cachedData && cachedTime && (now - cachedTime < CACHE_DURATION_MS)) {
-        console.log("⚡ Fetching layout data instantly from local cache storage.");
         storeData = JSON.parse(cachedData);
         renderProducts();
       } else {
-        console.log("☁️ Pulling fresh layout configuration from live cloud storage.");
         fetchStoreFromCloud();
       }
 
@@ -145,14 +218,14 @@
         const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
         fetch(firestoreUrl)
-  .then(async res => {
-    if (!res.ok) {
-      const errData = await res.json().catch(() => ({}));
-      const errMsg = errData.error?.message || `HTTP Status ${res.status}`;
-      throw new Error(errMsg);
-    }
-    return res.json();
-  })
+          .then(async res => {
+            if (!res.ok) {
+              const errData = await res.json().catch(() => ({}));
+              const errMsg = errData.error?.message || `HTTP Status ${res.status}`;
+              throw new Error(errMsg);
+            }
+            return res.json();
+          })
           .then(doc => {
             if (!doc.fields) return;
 
@@ -176,9 +249,9 @@
             renderProducts();
           })
           .catch(err => {
-  console.error(err);
-  document.getElementById('products-list').innerHTML = `<p style='text-align:center; color:red; margin-top:40px;'>Diagnostic Error: ${err.message}</p>`;
-});
+            console.error(err);
+            document.getElementById('products-list').innerHTML = `<p style='text-align:center; color:#ef4444; margin-top:40px; font-weight:600;'>Diagnostic Error: ${err.message}</p>`;
+          });
       }
 
       function renderProducts() {
@@ -186,7 +259,7 @@
         listContainer.innerHTML = ""; 
         
         if (!storeData.items || storeData.items.length === 0) {
-          listContainer.innerHTML = "<p style='text-align:center;'>This store's catalog is currently empty.</p>";
+          listContainer.innerHTML = "<p style='text-align:center; color:#64748b; margin-top:40px;'>This store's catalog is empty.</p>";
           return;
         }
 
