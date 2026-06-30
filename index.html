@@ -109,6 +109,81 @@
 
   <script src="script.js"></script>
 </body>
+</html>    .product-thumb {
+      width: 75px;
+      height: 75px;
+      object-fit: cover;
+      border-radius: 6px;
+      background: #f0f0f0;
+      flex-shrink: 0;
+    }
+    .product-info {
+      flex-grow: 1;
+    }
+    .product-info h3 { margin: 0 0 4px 0; font-size: 15px; font-weight: 600; }
+    .product-info p { margin: 0; color: #075E54; font-weight: bold; font-size: 14px; }
+    .quantity-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-qty {
+      background-color: #25D366;
+      color: white;
+      border: none;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .qty-display { font-weight: bold; min-width: 15px; text-align: center; }
+    .cart-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      box-shadow: 0 -3px 10px rgba(0,0,0,0.1);
+      padding: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .total-price { font-size: 18px; font-weight: bold; }
+    .checkout-btn {
+      background-color: #25D366;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 25px;
+      font-weight: bold;
+      font-size: 15px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h2 style="margin:0;">🛒 Mobile Order Form</h2>
+    <p style="margin:5px 0 0 0; opacity:0.8;">Select your items and send order to WhatsApp</p>
+  </div>
+
+  <div class="container" id="products-list">
+    <p style="text-align:center; color:#666;">Loading store data...</p>
+  </div>
+
+  <div class="cart-bar">
+    <div class="total-price">Total: <span id="grand-total">0.00</span></div>
+    <button class="checkout-btn" id="whatsapp-submit">Order via WhatsApp 💬</button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
 </html>    .product-info h3 { margin: 0 0 5px 0; font-size: 16px; }
     .product-info p { margin: 0; color: #075E54; font-weight: bold; }
     .quantity-controls {
