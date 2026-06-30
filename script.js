@@ -79,6 +79,6 @@ document.getElementById('whatsapp-submit').addEventListener('click', () => {
     }
   });
   if (orderLines.length === 0) { return alert("Please select items first!"); }
-  let message = `*📦 NEW ORDER RECEIVED*\n\n` + orderLines.join("\n") + `\n\n*💵 GRAND TOTAL:* ${grandTotal.toLocaleString()}`;
+  let message = `Hello, I would like to place this order:\n\n` + orderLines.join("\n") + `\n\n*💵 GRAND TOTAL:* ${grandTotal.toLocaleString()}`;
   window.open(`https://wa.me/${storeData.phone}?text=${encodeURIComponent(message)}`, '_blank');
 });
