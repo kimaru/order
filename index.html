@@ -145,10 +145,14 @@
         const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
         fetch(firestoreUrl)
-          .then(res => {
-            if (!res.ok) throw new Error("Document not found.");
-            return res.json();
-          })
+  .then(async res => {
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      const errMsg = errData.error?.message || `HTTP Status ${res.status}`;
+      throw new Error(errMsg);
+    }
+    return res.json();
+  })
           .then(doc => {
             if (!doc.fields) return;
 
