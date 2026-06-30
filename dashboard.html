@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Merchant Dashboard</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f7f6;
+      color: #333;
+    }
+    .navbar {
+      background-color: #075E54;
+      color: white;
+      padding: 15px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .navbar h2 { font-size: 18px; margin: 0; }
+    .main-container {
+      max-width: 1100px;
+      margin: 15px auto;
+      padding: 0 15px;
+    }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+    }
+    .form-row {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 5px;
+      flex-wrap: wrap;
+    }
+    .form-group {
+      flex: 1;
+      min-width: 100%;
+    }
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 6px;
+      font-size: 13px;
+    }
+    input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 14px;
+    }
+    
+    /* Responsive Item Layout cards for Mobile instead of rigid tables */
+    .product-row-item {
+      display: flex;
+      flex-direction: column;
+      background: #fdfdfd;
+      border: 1px solid #eaeaea;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      gap: 10px;
+      position: relative;
+    }
+    .item-media-box {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .row-preview-img {
+      width: 65px;
+      height: 65px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #ddd;
+      background: #f0f0f0;
+    }
+    
+    .btn {
+      padding: 12px 18px;
+      border: none;
+      border-radius: 6px;
+      font-weight: bold;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .btn-success { background-color: #25D366; color: white; width: 100%; margin-top: 10px; }
+    .btn-primary { background-color: #075E54; color: white; }
+    .btn-danger { background-color: #dc3545; color: white; width: 100%; padding: 8px; }
+    
+    .flex-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+    .upload-btn-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+    }
+    .upload-btn-wrapper input[type=file] {
+      font-size: 100px;
+      position: absolute;
+      left: 0;
+      top: 0;
+      opacity: 0;
+      cursor: pointer;
+    }
+    #link-box {
+      background: #e1f5fe;
+      border: 1px dashed #0288d1;
+      padding: 15px;
+      border-radius: 6px;
+      margin-top: 15px;
+      word-break: break-all;
+    }
+    .upload-status {
+      font-size: 12px;
+      color: #666;
+    }
+
+    /* Desktop layout optimization scaling */
+    @media (min-width: 600px) {
+      .navbar h2 { font-size: 22px; }
+      .form-group { min-width: 200px; }
+      .product-row-item {
+        flex-direction: row;
+        align-items: center;
+        justify-content: space-between;
+      }
+      .btn-success { width: auto; margin-top: 0; }
+      .btn-danger { width: auto; }
+      .form-group-item { flex: 1; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="navbar">
+    <h2>🚀 Mobile Cloud Dashboard</h2>
+    <button class="btn btn-primary" id="save-btn" style="background-color: #34b7f1; font-size:12px; padding:8px 12px;">💾 Save Local</button>
+  </div>
+
+  <div class="main-container">
+    
+    <div class="card">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Unique Store Username/ID (No spaces):</label>
+          <input type="text" id="store-id" placeholder="e.g. kimarustore">
+        </div>
+        <div class="form-group" style="margin-top: 10px;">
+          <label>WhatsApp Phone Number (with country code):</label>
+          <input type="text" id="phone" placeholder="e.g., 254712345678">
+        </div>
+      </div>
+      <button class="btn btn-success" id="generate-btn">🚀 Publish Changes Live</button>
+      
+      <div id="link-box" style="display: none;">
+        <strong>Your Live Mobile Store Link:</strong><br>
+        <a id="store-url" href="#" target="_blank" style="color: #0288d1; font-weight: bold;">Link will load here</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="flex-header">
+        <h3 style="margin:0; font-size:16px;">Inventory Manager</h3>
+        <button class="btn btn-primary" id="add-item-btn" style="padding: 8px 14px;">+ Add Product</button>
+      </div>
+      
+      <div id="inventory-container">
+        </div>
+    </div>
+
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
