@@ -50,7 +50,7 @@
       display: flex;
       align-items: center;
       gap: 16px;
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.01);
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
       border: 1px solid #edf0f2;
       transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -200,6 +200,7 @@
         return;
       }
 
+      // 🛠️ MULTI-STORE CACHE ISOLATION RULES
       const cacheKey = `cache_store_${storeId}`;
       const cacheTimeKey = `cache_time_${storeId}`;
       
@@ -207,10 +208,13 @@
       const cachedTime = localStorage.getItem(cacheTimeKey);
       const now = Date.now();
 
+      // Only hit the cache if data exists AND it belongs to THIS specific store ID, AND it hasn't expired
       if (cachedData && cachedTime && (now - cachedTime < CACHE_DURATION_MS)) {
+        console.log(`⚡ Cache Hit for store: ${storeId}`);
         storeData = JSON.parse(cachedData);
         renderProducts();
       } else {
+        console.log(`☁️ Cache Miss or New Store detected (${storeId}). Fetching live data...`);
         fetchStoreFromCloud();
       }
 
@@ -243,6 +247,7 @@
 
             storeData = { phone, items: parsedItems };
 
+            // Securely isolate this store's records into its own browser memory slot
             localStorage.setItem(cacheKey, JSON.stringify(storeData));
             localStorage.setItem(cacheTimeKey, now.toString());
 
