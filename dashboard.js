@@ -11,7 +11,6 @@ const firebaseConfig = {
 
 let inventory = [];
 
-// Since extensions use chrome.storage, web mobile pages use localStorage seamlessly!
 const savedPhone = localStorage.getItem('merchantPhone') || '';
 const savedStoreId = localStorage.getItem('customStoreId') || '';
 const savedInventory = localStorage.getItem('merchantInventory') ? JSON.parse(localStorage.getItem('merchantInventory')) : [];
@@ -142,7 +141,8 @@ document.getElementById('generate-btn').addEventListener('click', () => {
       return;
     }
 
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/stores/${storeId}?updateMask.fieldPaths=phone&updateMask.fieldPaths=items`;
+    // ⚡ SWITCH TO CLEAN UNCONDITIONAL OVERWRITE ARCHITECTURE (Removes trailing update mask strings)
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/stores/${storeId}`;
     
     const payload = {
       fields: {
@@ -163,6 +163,7 @@ document.getElementById('generate-btn').addEventListener('click', () => {
       }
     };
 
+    // ⚡ Using PATCH without query params forces clean, structural initialization if the doc doesn't exist yet!
     fetch(firestoreUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -176,7 +177,10 @@ document.getElementById('generate-btn').addEventListener('click', () => {
         document.getElementById('store-url').innerText = finalFormUrl;
         document.getElementById('link-box').style.display = 'block';
         alert("🚀 Inventory published directly from mobile to the cloud database successfully!");
-      } else { alert("Cloud submission refused."); }
+      } else { 
+        console.error("Firebase Response:", data);
+        alert("Cloud submission refused. Ensure your rules tab allows database transactions."); 
+      }
     }).catch(err => alert("Error: " + err.message));
   });
 });
