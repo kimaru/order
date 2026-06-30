@@ -26,15 +26,67 @@ function renderProducts() {
 
   storeData.items.forEach((item, index) => {
     quantities[index] = 0;
+    
+    // Fallback safe image placeholder if image field didn't upload or load
+    const imgSrc = item.img ? item.img : 'https://placehold.co/100x100?text=No+Image';
+    
     const card = document.createElement('div');
     card.className = 'product-card';
     card.innerHTML = `
+      <img class="product-thumb" src="${imgSrc}">
       <div class="product-info">
         <h3>${item.name}</h3>
         <p>${Number(item.price).toLocaleString()}</p>
       </div>
       <div class="quantity-controls">
-        <button class="btn-minus" data-id="${index}">-</button>
+        <button class="btn-qty btn-minus" data-id="${index}">-</button>
+        <span class="qty-display" id="qty-${index}">0</span>
+        <button class="btn-qty btn-plus" data-id="${index}">+</button>
+      </div>
+    `;
+    listContainer.appendChild(card);
+  });
+
+  document.querySelectorAll('.btn-minus').forEach(btn => {
+    btn.addEventListener('click', (e) => handleQtyChange(e.target.dataset.id, -1));
+  });
+  document.querySelectorAll('.btn-plus').forEach(btn => {
+    btn.addEventListener('click', (e) => handleQtyChange(e.target.dataset.id, 1));
+  });
+}
+
+function handleQtyChange(index, change) {
+  let currentQty = quantities[index] || 0;
+  currentQty += change;
+  if (currentQty < 0) currentQty = 0;
+  quantities[index] = currentQty;
+  document.getElementById(`qty-${index}`).innerText = currentQty;
+  calculateTotal();
+}
+
+function calculateTotal() {
+  let total = 0;
+  storeData.items.forEach((item, index) => {
+    total += Number(item.price) * (quantities[index] || 0);
+  });
+  document.getElementById('grand-total').innerText = total.toLocaleString();
+}
+
+document.getElementById('whatsapp-submit').addEventListener('click', () => {
+  let orderLines = [];
+  let grandTotal = 0;
+  storeData.items.forEach((item, index) => {
+    const qty = quantities[index] || 0;
+    if (qty > 0) {
+      const itemTotal = Number(item.price) * qty;
+      orderLines.push(`• ${item.name} (x${qty}) - ${itemTotal.toLocaleString()}`);
+      grandTotal += itemTotal;
+    }
+  });
+  if (orderLines.length === 0) { return alert("Please select items first!"); }
+  let message = `Hello, I would like to place this order:\n\n` + orderLines.join("\n") + `\n\n*💵 GRAND TOTAL:* ${grandTotal.toLocaleString()}`;
+  window.open(`https://wa.me/${storeData.phone}?text=${encodeURIComponent(message)}`, '_blank');
+});        <button class="btn-minus" data-id="${index}">-</button>
         <span class="qty-display" id="qty-${index}">0</span>
         <button class="btn-plus" data-id="${index}">+</button>
       </div>
