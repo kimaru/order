@@ -6,139 +6,177 @@
   <title>WhatsApp Merchant Dashboard</title>
   <style>
     body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       margin: 0;
       padding: 0;
-      background-color: #f4f7f6;
-      color: #333;
+      background-color: #f8fafc;
+      color: #1e293b;
+      -webkit-font-smoothing: antialiased;
     }
     .navbar {
-      background-color: #075E54;
+      background: linear-gradient(135deg, #075E54 0%, #0c4a42 100%);
       color: white;
-      padding: 15px 20px;
+      padding: 18px 20px;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.04);
     }
-    .navbar h2 { font-size: 18px; margin: 0; }
+    .navbar h2 { font-size: 19px; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
     .main-container {
-      max-width: 1100px;
-      margin: 15px auto;
-      padding: 0 15px;
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 0 16px;
+      box-sizing: border-box;
     }
     .card {
       background: white;
-      border-radius: 8px;
-      padding: 15px;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.03), 0 2px 4px -1px rgba(0, 0, 0, 0.02);
       margin-bottom: 20px;
+      border: 1px solid #e2e8f0;
     }
-    .form-row {
-      display: flex;
-      gap: 15px;
-      margin-bottom: 5px;
-      flex-wrap: wrap;
+    .card h3 {
+      margin: 0 0 20px 0;
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+      letter-spacing: -0.3px;
     }
     .form-group {
-      flex: 1;
-      min-width: 100%;
+      margin-bottom: 18px;
     }
     label {
       display: block;
-      font-weight: bold;
-      margin-bottom: 6px;
+      font-weight: 600;
+      margin-bottom: 8px;
       font-size: 13px;
+      color: #475569;
     }
     input[type="text"], input[type="number"] {
       width: 100%;
-      padding: 12px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
+      padding: 12px 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
       box-sizing: border-box;
       font-size: 14px;
+      transition: all 0.15s ease;
+      background-color: #f8fafc;
+      color: #0f172a;
+    }
+    input[type="text"]:focus, input[type="number"]:focus {
+      outline: none;
+      border-color: #128C7E;
+      background-color: white;
+      box-shadow: 0 0 0 3px rgba(18, 140, 126, 0.1);
     }
     
-    /* Responsive Item Layout cards for Mobile instead of rigid tables */
     .product-row-item {
       display: flex;
       flex-direction: column;
-      background: #fdfdfd;
-      border: 1px solid #eaeaea;
-      border-radius: 8px;
-      padding: 12px;
-      margin-bottom: 12px;
-      gap: 10px;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 16px;
+      margin-bottom: 14px;
+      gap: 14px;
       position: relative;
     }
     .item-media-box {
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: 16px;
     }
     .row-preview-img {
-      width: 65px;
-      height: 65px;
+      width: 74px;
+      height: 74px;
       object-fit: cover;
-      border-radius: 6px;
-      border: 1px solid #ddd;
-      background: #f0f0f0;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      background: #f1f5f9;
     }
     
     .btn {
-      padding: 12px 18px;
+      padding: 14px 24px;
       border: none;
-      border-radius: 6px;
-      font-weight: bold;
+      border-radius: 10px;
+      font-weight: 700;
       cursor: pointer;
       font-size: 14px;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    .btn-success { background-color: #25D366; color: white; width: 100%; margin-top: 10px; }
+    .btn-success {
+      background: linear-gradient(135deg, #25D366 0%, #1ecc5b 100%);
+      color: white;
+      width: 100%;
+      box-shadow: 0 4px 12px rgba(37,211,102,0.15);
+    }
+    .btn-success:active { transform: scale(0.98); }
     .btn-primary { background-color: #075E54; color: white; }
-    .btn-danger { background-color: #dc3545; color: white; width: 100%; padding: 8px; }
+    .btn-primary:active { transform: scale(0.97); }
+    .btn-danger {
+      background-color: #fee2e2;
+      color: #ef4444;
+      width: 100%;
+      padding: 10px;
+    }
+    .btn-danger:active { background-color: #fca5a5; }
     
     .flex-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 15px;
+      margin-bottom: 20px;
     }
     .upload-btn-wrapper {
       position: relative;
       overflow: hidden;
       display: inline-block;
     }
+    .upload-btn-wrapper .btn {
+      background-color: #ffffff;
+      color: #334155;
+      font-size: 13px;
+      padding: 8px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+    }
     .upload-btn-wrapper input[type=file] {
-      font-size: 100px;
       position: absolute;
       left: 0;
       top: 0;
       opacity: 0;
       cursor: pointer;
+      height: 100%;
+      width: 100%;
     }
     #link-box {
-      background: #e1f5fe;
-      border: 1px dashed #0288d1;
-      padding: 15px;
-      border-radius: 6px;
-      margin-top: 15px;
+      background: #f0fdf4;
+      border: 1px dashed #22c55e;
+      padding: 18px;
+      border-radius: 12px;
+      margin-top: 20px;
       word-break: break-all;
+      font-size: 14px;
+      line-height: 1.5;
     }
     .upload-status {
       font-size: 12px;
-      color: #666;
+      color: #64748b;
+      font-weight: 600;
     }
 
-    /* Desktop layout optimization scaling */
     @media (min-width: 600px) {
-      .navbar h2 { font-size: 22px; }
-      .form-group { min-width: 200px; }
       .product-row-item {
         flex-direction: row;
         align-items: center;
-        justify-content: space-between;
+        gap: 16px;
       }
-      .btn-success { width: auto; margin-top: 0; }
-      .btn-danger { width: auto; }
+      .btn-danger { width: auto; padding: 12px 20px; }
       .form-group-item { flex: 1; }
     }
   </style>
@@ -146,35 +184,35 @@
 <body>
 
   <div class="navbar">
-    <h2>🚀 Mobile Cloud Dashboard</h2>
-    <button class="btn btn-primary" id="save-btn" style="background-color: #34b7f1; font-size:12px; padding:8px 12px;">💾 Save Local</button>
+    <h2>🚀 Merchant Control Center</h2>
+    <button class="btn btn-primary" id="save-btn" style="background-color: rgba(255,255,255,0.15); font-size:12px; padding:8px 14px;">💾 Draft Blueprint</button>
   </div>
 
   <div class="main-container">
     
     <div class="card">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Unique Store Username/ID (No spaces):</label>
-          <input type="text" id="store-id" placeholder="e.g. kimarustore">
-        </div>
-        <div class="form-group" style="margin-top: 10px;">
-          <label>WhatsApp Phone Number (with country code):</label>
-          <input type="text" id="phone" placeholder="e.g., 254712345678">
-        </div>
+      <h3>Store Configuration</h3>
+      <div class="form-group">
+        <label>Unique Store ID (No spaces or special characters):</label>
+        <input type="text" id="store-id" placeholder="e.g. myboutique">
       </div>
-      <button class="btn btn-success" id="generate-btn">🚀 Publish Changes Live</button>
+      <div class="form-group">
+        <label>WhatsApp Phone Number (With country code, no + sign):</label>
+        <input type="text" id="phone" placeholder="e.g. 254712345678">
+      </div>
+      <button class="btn btn-success" id="generate-btn">🚀 Publish Changes to Live Cloud</button>
       
       <div id="link-box" style="display: none;">
-        <strong>Your Live Mobile Store Link:</strong><br>
-        <a id="store-url" href="#" target="_blank" style="color: #0288d1; font-weight: bold;">Link will load here</a>
+        <strong style="color: #15803d; font-size: 15px;">🎉 Live Storefront Online!</strong><br>
+        <p style="margin: 6px 0 12px 0; color: #475569; font-size: 13px;">Copy this link and put it in your WhatsApp Business greeting message or Instagram Bio:</p>
+        <a id="store-url" href="#" target="_blank" style="color: #16a34a; font-weight: 700; text-decoration: none; border-bottom: 1.5px dashed #16a34a; padding-bottom: 2px;">Link loading...</a>
       </div>
     </div>
 
     <div class="card">
       <div class="flex-header">
-        <h3 style="margin:0; font-size:16px;">Inventory Manager</h3>
-        <button class="btn btn-primary" id="add-item-btn" style="padding: 8px 14px;">+ Add Product</button>
+        <h3 style="margin:0;">Product Catalog</h3>
+        <button class="btn btn-primary" id="add-item-btn" style="padding: 8px 16px; font-size: 13px; border-radius: 8px;">+ Add New Item</button>
       </div>
       
       <div id="inventory-container">
