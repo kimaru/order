@@ -172,9 +172,9 @@
             renderProducts();
           })
           .catch(err => {
-            console.error(err);
-            document.getElementById('products-list').innerHTML = "<p style='text-align:center; color:red;'>Store catalog unavailable or matching configuration missing.</p>";
-          });
+  console.error(err);
+  document.getElementById('products-list').innerHTML = `<p style='text-align:center; color:red; margin-top:40px;'>Diagnostic Error: ${err.message}</p>`;
+});
       }
 
       function renderProducts() {
