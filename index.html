@@ -109,21 +109,72 @@
 
   <script type="text/javascript">
     (function() {
+      // Linked to your specific firebase project space
+      const PROJECT_ID = "whatsapp-eco-engine-80882";
+      const CACHE_DURATION_MS = 10 * 60 * 1000; // 10 minutes client-side cost guard
+
       let storeData = { phone: "", items: [] };
       let quantities = {};
 
-      try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const rawParam = urlParams.get('store');
+      const urlParams = new URLSearchParams(window.location.search);
+      const storeId = urlParams.get('id');
 
-        if (rawParam) {
-          storeData = JSON.parse(decodeURIComponent(rawParam));
-          renderProducts();
-        } else {
-          document.getElementById('products-list').innerHTML = "<p style='text-align:center;'>No products loaded. Use the link from your Merchant Dashboard.</p>";
-        }
-      } catch (err) {
-        document.getElementById('products-list').innerHTML = "<p style='text-align:center; color:red;'>Format decoding failure.</p>";
+      if (!storeId) {
+        document.getElementById('products-list').innerHTML = "<p style='text-align:center;'>Error: No Store ID provided in URL.</p>";
+        return;
+      }
+
+      const cacheKey = `cache_store_${storeId}`;
+      const cacheTimeKey = `cache_time_${storeId}`;
+      
+      const cachedData = localStorage.getItem(cacheKey);
+      const cachedTime = localStorage.getItem(cacheTimeKey);
+      const now = Date.now();
+
+      // Check optimization memory cache layer first
+      if (cachedData && cachedTime && (now - cachedTime < CACHE_DURATION_MS)) {
+        console.log("⚡ Fetching layout data instantly from local cache storage.");
+        storeData = JSON.parse(cachedData);
+        renderProducts();
+      } else {
+        console.log("☁️ Pulling fresh layout configuration from live cloud storage.");
+        fetchStoreFromCloud();
+      }
+
+      function fetchStoreFromCloud() {
+        const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
+
+        fetch(firestoreUrl)
+          .then(res => {
+            if (!res.ok) throw new Error("Document not found.");
+            return res.json();
+          })
+          .then(doc => {
+            if (!doc.fields) return;
+
+            const phone = doc.fields.phone?.stringValue || "";
+            const rawItems = doc.fields.items?.arrayValue?.values || [];
+            
+            const parsedItems = rawItems.map(item => {
+              const mapFields = item.mapValue?.fields || {};
+              return {
+                name: mapFields.name?.stringValue || "Product",
+                price: Number(mapFields.price?.doubleValue || mapFields.price?.integerValue || 0),
+                img: mapFields.img?.stringValue || ""
+              };
+            });
+
+            storeData = { phone, items: parsedItems };
+
+            localStorage.setItem(cacheKey, JSON.stringify(storeData));
+            localStorage.setItem(cacheTimeKey, now.toString());
+
+            renderProducts();
+          })
+          .catch(err => {
+            console.error(err);
+            document.getElementById('products-list').innerHTML = "<p style='text-align:center; color:red;'>Store catalog unavailable or matching configuration missing.</p>";
+          });
       }
 
       function renderProducts() {
@@ -131,7 +182,7 @@
         listContainer.innerHTML = ""; 
         
         if (!storeData.items || storeData.items.length === 0) {
-          listContainer.innerHTML = "<p style='text-align:center;'>Your catalog is empty.</p>";
+          listContainer.innerHTML = "<p style='text-align:center;'>This store's catalog is currently empty.</p>";
           return;
         }
 
@@ -142,7 +193,7 @@
           const card = document.createElement('div');
           card.className = 'product-card';
           card.innerHTML = `
-            <img class="product-thumb" src="${imgSrc}">
+            <img class="product-thumb" src="${imgSrc}" onerror="this.src='https://placehold.co/100x100?text=No+Image';">
             <div class="product-info">
               <h3>${item.name}</h3>
               <p>${Number(item.price).toLocaleString()}</p>
