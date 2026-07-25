@@ -26,6 +26,11 @@
   const productListContainer = document.getElementById("product-list-container");
   const prodCount = document.getElementById("prod-count");
 
+  // Category Manager Elements
+  const manageCategorySelect = document.getElementById("manage-category-select");
+  const renameCatBtn = document.getElementById("rename-cat-btn");
+  const deleteCatBtn = document.getElementById("delete-cat-btn");
+
   const copyLinkBtn = document.getElementById("copy-link-btn");
 
   let localItems = [];
@@ -35,7 +40,7 @@
   let currentGeneratedUrl = "";
   let editingIndex = -1;
 
-  // Handle Category Dropdown Toggle
+  // Handle Product Form Category Dropdown Toggle
   if (prodCategorySelect) {
     prodCategorySelect.addEventListener("change", (e) => {
       if (e.target.value === "__ADD_NEW__") {
@@ -48,36 +53,99 @@
     });
   }
 
-  // Populate & Refresh Category Dropdown Options
-  function refreshCategoryDropdown(selectedCategory = "General") {
-    if (!prodCategorySelect) return;
-
-    // Collect all existing categories from products
+  // Populate Product Dropdown and Category Manager Dropdown
+  function refreshCategoryDropdowns(selectedCategory = "General") {
+    // Collect categories actively used by products
+    availableCategories = new Set(["General"]);
     localItems.forEach(item => {
       if (item.category) availableCategories.add(item.category);
     });
 
-    prodCategorySelect.innerHTML = "";
+    // 1. Refresh Product Addition Form Dropdown
+    if (prodCategorySelect) {
+      prodCategorySelect.innerHTML = "";
+      availableCategories.forEach(cat => {
+        const opt = document.createElement("option");
+        opt.value = cat;
+        opt.innerText = cat;
+        prodCategorySelect.appendChild(opt);
+      });
 
-    availableCategories.forEach(cat => {
-      const opt = document.createElement("option");
-      opt.value = cat;
-      opt.innerText = cat;
-      prodCategorySelect.appendChild(opt);
-    });
+      const addNewOpt = document.createElement("option");
+      addNewOpt.value = "__ADD_NEW__";
+      addNewOpt.innerText = "➕ Add another category...";
+      prodCategorySelect.appendChild(addNewOpt);
 
-    const addNewOpt = document.createElement("option");
-    addNewOpt.value = "__ADD_NEW__";
-    addNewOpt.innerText = "➕ Add another category...";
-    prodCategorySelect.appendChild(addNewOpt);
-
-    if (availableCategories.has(selectedCategory)) {
-      prodCategorySelect.value = selectedCategory;
-      prodCustomCategoryInput.style.display = "none";
-    } else if (selectedCategory && selectedCategory !== "General") {
-      availableCategories.add(selectedCategory);
-      refreshCategoryDropdown(selectedCategory);
+      if (availableCategories.has(selectedCategory)) {
+        prodCategorySelect.value = selectedCategory;
+        prodCustomCategoryInput.style.display = "none";
+      } else if (selectedCategory && selectedCategory !== "General") {
+        availableCategories.add(selectedCategory);
+        refreshCategoryDropdowns(selectedCategory);
+      }
     }
+
+    // 2. Refresh Category Manager Tool Dropdown
+    if (manageCategorySelect) {
+      manageCategorySelect.innerHTML = `<option value="">Select a category to manage...</option>`;
+      availableCategories.forEach((cat) => {
+        if (cat !== "General") {
+          const opt = document.createElement("option");
+          opt.value = cat;
+          opt.innerText = cat;
+          manageCategorySelect.appendChild(opt);
+        }
+      });
+    }
+  }
+
+  // Rename Category Across All Products
+  if (renameCatBtn) {
+    renameCatBtn.addEventListener("click", () => {
+      const oldCat = manageCategorySelect.value;
+      if (!oldCat) {
+        showStatus("Please select a category to rename.", true);
+        return;
+      }
+
+      const newCat = prompt(`Enter new name for category "${oldCat}":`, oldCat);
+      if (!newCat || newCat.trim() === "" || newCat.trim() === oldCat) return;
+
+      const trimmedNewCat = newCat.trim();
+
+      localItems.forEach((item) => {
+        if (item.category === oldCat) {
+          item.category = trimmedNewCat;
+        }
+      });
+
+      renderProducts();
+      refreshCategoryDropdowns(trimmedNewCat);
+      showStatus(`Renamed category "${oldCat}" to "${trimmedNewCat}". Click "Publish" to sync.`);
+    });
+  }
+
+  // Delete Category Across All Products (Revert assigned items to "General")
+  if (deleteCatBtn) {
+    deleteCatBtn.addEventListener("click", () => {
+      const targetCat = manageCategorySelect.value;
+      if (!targetCat) {
+        showStatus("Please select a category to delete.", true);
+        return;
+      }
+
+      if (confirm(`Are you sure you want to delete category "${targetCat}"? All items in this category will be moved to "General".`)) {
+        localItems.forEach((item) => {
+          if (item.category === targetCat) {
+            item.category = "General";
+          }
+        });
+
+        renderProducts();
+        refreshCategoryDropdowns("General");
+        showStatus(`Deleted category "${targetCat}". Assigned items moved to "General". Click "Publish" to sync.`);
+      }
+    });
   }
 
   function updateStoreLinkBanner(storeId) {
@@ -179,7 +247,7 @@
     setTimeout(() => { statusMsg.style.display = "none"; }, 5000);
   }
 
-  // Fetch Store Data
+  // Fetch Store Data from Firestore
   function fetchFromCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
     if (!storeId) {
@@ -221,7 +289,7 @@
 
         resetProductForm();
         renderProducts();
-        refreshCategoryDropdown();
+        refreshCategoryDropdowns();
         updateStoreLinkBanner(storeId);
         showStatus(`Loaded store "${storeId}" with ${localItems.length} products!`);
       })
@@ -273,7 +341,7 @@
         localItems.splice(idx, 1);
         if (editingIndex == idx) resetProductForm();
         renderProducts();
-        refreshCategoryDropdown();
+        refreshCategoryDropdowns();
       });
     });
 
@@ -294,7 +362,7 @@
     prodStockSelect.value = item.stock || "instock";
     currentProdImgBase64 = item.img || "";
 
-    refreshCategoryDropdown(item.category || "General");
+    refreshCategoryDropdowns(item.category || "General");
 
     if (prodPreviewImg) {
       prodPreviewImg.src = item.img || "https://placehold.co/100x100?text=Product";
@@ -318,7 +386,7 @@
     currentProdImgBase64 = "";
     if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
 
-    refreshCategoryDropdown();
+    refreshCategoryDropdowns();
 
     addProdBtn.innerText = "+ Add Product to List";
     addProdBtn.style.background = "#f1f5f9";
@@ -334,7 +402,6 @@
       const price = Number(prodPriceInput.value);
       const stock = prodStockSelect.value;
 
-      // Determine category (Selected vs Custom typed)
       let category = prodCategorySelect.value;
       if (category === "__ADD_NEW__") {
         category = prodCustomCategoryInput.value.trim();
@@ -356,8 +423,8 @@
         showStatus(`Added "${name}" to list. Click "Publish All Changes" to sync online.`);
       }
 
-      availableCategories.add(category);
       renderProducts();
+      refreshCategoryDropdowns(category);
       resetProductForm();
     });
   }
