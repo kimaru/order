@@ -3,288 +3,110 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Storefront - EcoEngine</title>
+  <title>Storefront</title>
   <style>
-    :root {
-      --accent-color: #10b981; /* Default Emerald Green */
-      --bg-color: #f8fafc;
-      --card-bg: #ffffff;
-      --text-dark: #0f172a;
-      --text-muted: #64748b;
-    }
-
+    :root { --accent-color: #10b981; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: var(--bg-color); color: var(--text-dark); padding-bottom: 90px; }
+    body { background-color: #f8fafc; color: #0f172a; padding-bottom: 80px; }
 
-    /* Header & Branding Zone */
-    header {
-      background: var(--card-bg);
-      padding: 18px 20px;
-      border-bottom: 1px solid #e2e8f0;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.03);
-    }
+    header { background: white; border-bottom: 1px solid #e2e8f0; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; sticky: top; top: 0; z-index: 10; }
+    .brand-container { display: flex; align-items: center; gap: 12px; }
+    .brand-logo { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
+    .brand-title { font-size: 18px; font-weight: 700; text-transform: capitalize; }
+    .brand-slogan { font-size: 12px; color: #64748b; }
 
-    .brand-container {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      max-width: 800px;
-      margin: 0 auto;
-    }
+    .cart-btn { background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
 
-    .brand-logo {
-      width: 52px;
-      height: 52px;
-      border-radius: 50%;
-      object-fit: cover;
-      background-color: #f1f5f9;
-      border: 2px solid var(--accent-color);
-      flex-shrink: 0;
-      display: none; /* Shown dynamically if logo exists */
-    }
+    /* Category Filter Chips */
+    .categories-bar { display: flex; gap: 8px; overflow-x: auto; padding: 16px 20px 4px 20px; scrollbar-width: none; }
+    .categories-bar::-webkit-scrollbar { display: none; }
+    .chip { background: white; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; white-space: nowrap; }
+    .chip.active { background: var(--accent-color); color: white; border-color: var(--accent-color); }
 
-    .brand-info h1 {
-      font-size: 20px;
-      font-weight: 700;
-      color: var(--text-dark);
-      line-height: 1.2;
-      text-transform: capitalize;
-    }
-
-    .brand-info p {
-      font-size: 13px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    /* Container & Product Grid */
-    .container { max-width: 800px; margin: 20px auto; padding: 0 16px; }
-
-    .product-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 16px;
-    }
-
-    .product-card {
-      background: var(--card-bg);
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .product-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-
-    .product-img {
-      width: 100%;
-      height: 150px;
-      object-fit: cover;
-      background: #f1f5f9;
-    }
-
-    .product-details { padding: 12px; display: flex; flex-direction: column; flex-grow: 1; justify-content: space-between; }
-    .product-title { font-size: 14px; font-weight: 600; color: var(--text-dark); margin-bottom: 6px; }
+    /* Product Grid */
+    .container { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+    .product-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    .product-img { width: 100%; height: 180px; object-fit: cover; background: #f1f5f9; }
+    .product-details { padding: 12px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+    .product-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
     .product-price { font-size: 15px; font-weight: 700; color: var(--accent-color); margin-bottom: 10px; }
 
-    .add-to-cart-btn {
-      width: 100%;
-      background: var(--accent-color);
-      color: white;
-      border: none;
-      padding: 8px 12px;
-      font-size: 13px;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: opacity 0.2s;
-    }
-    .add-to-cart-btn:hover { opacity: 0.9; }
+    .stock-tag { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+    .stock-instock { background: #dcfce7; color: #166534; }
+    .stock-lowstock { background: #fef9c3; color: #854d0e; }
+    .stock-outofstock { background: #fee2e2; color: #991b1b; }
 
-    /* Sticky Bottom Floating Cart Bar */
-    .floating-cart-bar {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: var(--card-bg);
-      border-top: 1px solid #e2e8f0;
-      padding: 12px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 -4px 12px rgba(0,0,0,0.08);
-      z-index: 200;
-    }
+    .add-to-cart-btn { background: var(--accent-color); color: white; border: none; padding: 8px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; font-size: 13px; }
+    .add-to-cart-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
 
-    .cart-summary { display: flex; align-items: center; gap: 10px; }
-    .cart-badge {
-      background: var(--accent-color);
-      color: white;
-      font-size: 12px;
-      font-weight: 700;
-      width: 24px;
-      height: 24px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .cart-total { font-weight: 700; font-size: 16px; color: var(--text-dark); }
+    /* Cart Drawer */
+    .cart-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 20; }
+    .cart-drawer { position: fixed; top: 0; right: -400px; width: 100%; max-width: 380px; height: 100%; background: white; z-index: 30; transition: right 0.3s ease; display: flex; flex-direction: column; padding: 20px; }
+    .cart-drawer.open { right: 0; }
 
-    .view-cart-btn {
-      background: var(--accent-color);
-      color: white;
-      border: none;
-      padding: 10px 18px;
-      font-size: 14px;
-      font-weight: 600;
-      border-radius: 8px;
-      cursor: pointer;
-    }
-
-    /* Cart Slide-Out Drawer & Overlay */
-    .cart-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 300;
-      display: none;
-    }
-
-    .cart-drawer {
-      position: fixed;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      width: 100%;
-      max-width: 420px;
-      background: var(--card-bg);
-      z-index: 400;
-      transform: translateX(100%);
-      transition: transform 0.3s ease-in-out;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .cart-drawer.open { transform: translateX(0); }
-
-    .drawer-header {
-      padding: 16px 20px;
-      border-bottom: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .close-drawer-btn { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-muted); }
-
-    .drawer-body { padding: 20px; overflow-y: auto; flex-grow: 1; }
-    
-    .cart-item-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid #f1f5f9;
-    }
+    .cart-item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
     .qty-controls { display: flex; align-items: center; gap: 8px; }
-    .qty-btn {
-      width: 26px; height: 26px; border: 1px solid #cbd5e1; background: white; border-radius: 6px; font-weight: 600; cursor: pointer;
-    }
-
-    .delivery-form { margin-top: 20px; padding-top: 16px; border-top: 1px solid #e2e8f0; }
-    .delivery-form h3 { font-size: 14px; margin-bottom: 12px; color: var(--text-dark); }
-    .form-field { margin-bottom: 10px; }
-    .form-field input, .form-field textarea {
-      width: 100%; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; outline: none;
-    }
-    .form-field input:focus, .form-field textarea:focus { border-color: var(--accent-color); }
-
-    .drawer-footer { padding: 16px 20px; border-top: 1px solid #e2e8f0; background: #f8fafc; }
-    .checkout-btn {
-      width: 100%;
-      background: #25D366; /* WhatsApp Green */
-      color: white;
-      border: none;
-      padding: 12px;
-      font-size: 15px;
-      font-weight: 700;
-      border-radius: 8px;
-      cursor: pointer;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .loading-spinner { text-align: center; padding: 40px; color: var(--text-muted); font-size: 14px; }
+    .qty-btn { width: 24px; height: 24px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 4px; cursor: pointer; font-weight: 700; }
+    
+    .input-field { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; margin-top: 4px; margin-bottom: 8px; }
   </style>
 </head>
 <body>
 
-  <!-- Brand Header Zone -->
   <header>
     <div class="brand-container">
-      <img id="brand-logo" class="brand-logo" alt="Store Logo">
-      <div class="brand-info">
-        <h1 id="brand-name">Loading Store...</h1>
-        <p id="brand-slogan"></p>
+      <img id="brand-logo" class="brand-logo" src="" alt="Logo" style="display: none;">
+      <div>
+        <div id="brand-name" class="brand-title">Loading Store...</div>
+        <div id="brand-slogan" class="brand-slogan"></div>
       </div>
     </div>
+    <button id="open-cart-btn" class="cart-btn">
+      🛒 Cart (<span id="cart-badge">0</span>)
+    </button>
   </header>
 
-  <!-- Product Catalog Grid -->
-  <main class="container">
-    <div id="product-grid" class="product-grid">
-      <div class="loading-spinner">Loading catalog...</div>
-    </div>
-  </main>
+  <!-- Categories Filter -->
+  <div id="categories-bar" class="categories-bar"></div>
 
-  <!-- Floating Cart Bar -->
-  <div class="floating-cart-bar">
-    <div class="cart-summary">
-      <div id="cart-badge" class="cart-badge">0</div>
-      <div id="cart-total" class="cart-total">KSh 0</div>
-    </div>
-    <button id="open-cart-btn" class="view-cart-btn">View Cart 🛒</button>
+  <div class="container">
+    <div id="product-grid" class="grid"></div>
   </div>
 
-  <!-- Cart Drawer & Backdrop -->
+  <!-- Cart Drawer -->
   <div id="cart-overlay" class="cart-overlay"></div>
   <div id="cart-drawer" class="cart-drawer">
-    <div class="drawer-header">
-      <h2 style="font-size: 16px;">Your Order</h2>
-      <button id="close-cart-btn" class="close-drawer-btn">✕</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+      <h2 style="font-size: 18px;">Shopping Cart</h2>
+      <button id="close-cart-btn" style="background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
     </div>
 
-    <div class="drawer-body">
-      <div id="cart-items-container">
-        <!-- Dynamic Cart Items Rendered Here -->
-      </div>
+    <div id="cart-items-container" style="flex-grow: 1; overflow-y: auto;"></div>
 
-      <!-- Mandatory Customer Details Form -->
-      <div class="delivery-form">
-        <h3>📍 Delivery Details</h3>
-        <div class="form-field">
-          <input type="text" id="cust-name" placeholder="Full Name *" required>
-        </div>
-        <div class="form-field">
-          <input type="text" id="cust-address" placeholder="Delivery Address / City *" required>
-        </div>
-        <div class="form-field">
-          <textarea id="cust-notes" rows="2" placeholder="Delivery notes or special instructions (optional)"></textarea>
-        </div>
+    <!-- Promo Code Input -->
+    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9;">
+      <div style="display: flex; gap: 6px;">
+        <input type="text" id="cart-promo-input" class="input-field" placeholder="Discount Code" style="margin:0;">
+        <button id="apply-promo-btn" style="background: #334155; color: white; border: none; padding: 0 12px; border-radius: 6px; font-weight: 600; font-size: 12px; cursor: pointer;">Apply</button>
       </div>
+      <div id="promo-msg" style="font-size: 11px; margin-top: 4px;"></div>
     </div>
 
-    <div class="drawer-footer">
-      <button id="whatsapp-checkout-btn" class="checkout-btn">
+    <!-- Delivery Form & Checkout -->
+    <div style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 10px;">
+      <label style="font-size: 12px; font-weight: 600;">Full Name *</label>
+      <input type="text" id="cust-name" class="input-field" placeholder="Jane Doe">
+
+      <label style="font-size: 12px; font-weight: 600;">Delivery Address *</label>
+      <input type="text" id="cust-address" class="input-field" placeholder="Building, Street, Town">
+
+      <div style="margin: 10px 0; font-size: 15px; font-weight: 700; display: flex; justify-content: space-between;">
+        <span>Total:</span>
+        <span id="cart-total" style="color: var(--accent-color);">KSh 0</span>
+      </div>
+
+      <button id="whatsapp-checkout-btn" style="width: 100%; background: #25d366; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer;">
         💬 Order via WhatsApp
       </button>
     </div>
