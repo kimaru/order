@@ -27,14 +27,31 @@
   let currentLogoBase64 = "";
   let currentProdImgBase64 = "";
 
-  // Update Color Hex Label
+  // Dynamic Store Link Generator
+  function updateStoreLinkBanner(storeId) {
+    const banner = document.getElementById("store-link-banner");
+    const urlText = document.getElementById("store-url-text");
+    const visitBtn = document.getElementById("visit-store-btn");
+
+    if (!storeId || !banner) return;
+
+    // Detect current path and point to index.html
+    const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+    const fullUrl = `${window.location.origin}${basePath}/index.html?store=${encodeURIComponent(storeId)}`;
+
+    if (urlText) urlText.innerText = fullUrl;
+    if (visitBtn) visitBtn.href = fullUrl;
+    banner.style.display = "flex";
+  }
+
+  // Color Hex Display Listener
   if (storeThemeColorInput) {
     storeThemeColorInput.addEventListener("input", (e) => {
       if (colorHexLabel) colorHexLabel.innerText = e.target.value;
     });
   }
 
-  // Universal Client-Side Image Compressor
+  // Client-Side Image Compressor
   function compressImage(file, maxWidth, maxHeight, quality, callback) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -144,6 +161,7 @@
         });
 
         renderProducts();
+        updateStoreLinkBanner(storeId);
         showStatus(`Loaded store settings and ${localItems.length} products.`);
       })
       .catch((err) => {
@@ -152,7 +170,7 @@
       });
   }
 
-  // Render Product Catalog to DOM
+  // Render Product Catalog
   function renderProducts() {
     if (!productListContainer) return;
     productListContainer.innerHTML = "";
@@ -177,7 +195,6 @@
       productListContainer.appendChild(row);
     });
 
-    // Delete item handlers
     document.querySelectorAll(".del-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = e.target.getAttribute("data-index");
@@ -187,7 +204,7 @@
     });
   }
 
-  // Add Product Action
+  // Add Product to Local Array
   if (addProdBtn) {
     addProdBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -210,7 +227,7 @@
 
       renderProducts();
 
-      // Reset Form
+      // Reset Inputs
       prodNameInput.value = "";
       prodPriceInput.value = "";
       if (prodImgFileInput) prodImgFileInput.value = "";
@@ -265,6 +282,7 @@
         return res.json();
       })
       .then(() => {
+        updateStoreLinkBanner(storeId);
         showStatus("🚀 Store settings, branding, and catalog published successfully!");
       })
       .catch((err) => {
