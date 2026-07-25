@@ -10,6 +10,10 @@
   const storeThemeColorInput = document.getElementById("store-theme-color");
   const colorHexLabel = document.getElementById("color-hex-label");
   
+  const promoCodeInput = document.getElementById("promo-code");
+  const promoTypeSelect = document.getElementById("promo-type");
+  const promoValueInput = document.getElementById("promo-value");
+
   const saveSettingsBtn = document.getElementById("save-settings-btn");
   const fetchCloudBtn = document.getElementById("fetch-cloud-btn");
   const syncCloudBtn = document.getElementById("sync-cloud-btn");
@@ -17,17 +21,22 @@
 
   const prodNameInput = document.getElementById("prod-name");
   const prodPriceInput = document.getElementById("prod-price");
+  const prodCategoryInput = document.getElementById("prod-category");
+  const prodStockSelect = document.getElementById("prod-stock");
   const prodImgFileInput = document.getElementById("prod-img-file");
   const prodPreviewImg = document.getElementById("prod-preview-img");
   const addProdBtn = document.getElementById("add-prod-btn");
   const productListContainer = document.getElementById("product-list-container");
   const prodCount = document.getElementById("prod-count");
 
+  const copyLinkBtn = document.getElementById("copy-link-btn");
+
   let localItems = [];
   let currentLogoBase64 = "";
   let currentProdImgBase64 = "";
+  let currentGeneratedUrl = "";
 
-  // Dynamic Store Link Generator
+  // Dynamic Store Link Generator & Copy Handler
   function updateStoreLinkBanner(storeId) {
     const banner = document.getElementById("store-link-banner");
     const urlText = document.getElementById("store-url-text");
@@ -35,15 +44,22 @@
 
     if (!storeId || !banner) return;
 
-    // Build storefront link matching current path
     const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
-    const fullUrl = `${window.location.origin}${basePath}/index.html?store=${encodeURIComponent(storeId)}`;
+    currentGeneratedUrl = `${window.location.origin}${basePath}/index.html?store=${encodeURIComponent(storeId)}`;
 
-    if (urlText) urlText.innerText = fullUrl;
-    if (visitBtn) visitBtn.href = fullUrl;
+    if (urlText) urlText.innerText = currentGeneratedUrl;
+    if (visitBtn) visitBtn.href = currentGeneratedUrl;
     
-    // Force show banner
     banner.style.display = "flex";
+  }
+
+  if (copyLinkBtn) {
+    copyLinkBtn.addEventListener("click", () => {
+      if (!currentGeneratedUrl) return;
+      navigator.clipboard.writeText(currentGeneratedUrl).then(() => {
+        showStatus("📋 Storefront link copied to clipboard!");
+      });
+    });
   }
 
   // Color Hex Display Listener
@@ -88,7 +104,6 @@
     };
   }
 
-  // Handle Logo Upload
   if (storeLogoFileInput) {
     storeLogoFileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
@@ -101,7 +116,6 @@
     });
   }
 
-  // Handle Product Image Upload
   if (prodImgFileInput) {
     prodImgFileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
@@ -140,15 +154,18 @@
         return res.json();
       })
       .then((doc) => {
-        if (!doc.fields) {
-          showStatus("Store document is empty.", true);
-          return;
-        }
+        if (!doc.fields) return;
 
         storePhoneInput.value = doc.fields.phone?.stringValue || "";
         storeSloganInput.value = doc.fields.slogan?.stringValue || "";
         storeThemeColorInput.value = doc.fields.themeColor?.stringValue || "#10b981";
         if (colorHexLabel) colorHexLabel.innerText = storeThemeColorInput.value;
+
+        // Promo Code Parsing
+        const promoFields = doc.fields.promo?.mapValue?.fields || {};
+        promoCodeInput.value = promoFields.code?.stringValue || "";
+        promoTypeSelect.value = promoFields.type?.stringValue || "percent";
+        promoValueInput.value = promoFields.value?.doubleValue || promoFields.value?.integerValue || "";
 
         currentLogoBase64 = doc.fields.logo?.stringValue || "";
         if (logoPreviewImg) {
@@ -161,6 +178,8 @@
           return {
             name: fields.name?.stringValue || "",
             price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
+            category: fields.category?.stringValue || "General",
+            stock: fields.stock?.stringValue || "instock",
             img: fields.img?.stringValue || "",
           };
         });
@@ -188,12 +207,19 @@
     }
 
     localItems.forEach((item, index) => {
+      const stockBadge = item.stock === 'instock' 
+        ? `<span class="badge badge-instock">In Stock</span>`
+        : item.stock === 'lowstock'
+        ? `<span class="badge badge-lowstock">Low Stock</span>`
+        : `<span class="badge badge-outofstock">Out of Stock</span>`;
+
       const row = document.createElement("div");
       row.className = "product-row";
       row.innerHTML = `
         <img src="${item.img || 'https://placehold.co/100x100?text=No+Img'}" onerror="this.src='https://placehold.co/100x100?text=No+Img';">
         <div>
           <strong style="font-size: 14px; color: #0f172a;">${item.name}</strong>
+          <div style="font-size: 12px; color: #64748b;">🏷️ ${item.category || 'General'} | ${stockBadge}</div>
         </div>
         <div style="font-weight: 600; font-size: 14px; color: #0f172a;">KSh ${item.price.toLocaleString()}</div>
         <button class="del-btn" data-index="${index}">🗑️</button>
@@ -217,6 +243,8 @@
 
       const name = prodNameInput.value.trim();
       const price = Number(prodPriceInput.value);
+      const category = prodCategoryInput.value.trim() || "General";
+      const stock = prodStockSelect.value;
 
       if (!name || isNaN(price) || price <= 0) {
         showStatus("Please enter a valid product name and price.", true);
@@ -228,6 +256,8 @@
       localItems.push({
         name: name,
         price: price,
+        category: category,
+        stock: stock,
         img: finalImg
       });
 
@@ -235,6 +265,7 @@
 
       prodNameInput.value = "";
       prodPriceInput.value = "";
+      prodCategoryInput.value = "";
       if (prodImgFileInput) prodImgFileInput.value = "";
       currentProdImgBase64 = "";
       if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
@@ -243,15 +274,19 @@
     });
   }
 
-  // Save/Publish to Firestore (Patch Document)
+  // Save/Publish to Firestore
   function saveToCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
     const phone = storePhoneInput.value.trim();
     const slogan = storeSloganInput.value.trim();
     const themeColor = storeThemeColorInput.value || "#10b981";
 
+    const promoCode = promoCodeInput.value.trim().toUpperCase();
+    const promoType = promoTypeSelect.value;
+    const promoValue = Number(promoValueInput.value) || 0;
+
     if (!storeId) {
-      showStatus("Please enter a Store ID (e.g. aromatic-vibes).", true);
+      showStatus("Please enter a Store ID.", true);
       return;
     }
 
@@ -262,6 +297,8 @@
         fields: {
           name: { stringValue: item.name || "" },
           price: { doubleValue: Number(item.price) || 0 },
+          category: { stringValue: item.category || "General" },
+          stock: { stringValue: item.stock || "instock" },
           img: { stringValue: item.img || "" },
         },
       },
@@ -273,6 +310,15 @@
         slogan: { stringValue: slogan || "" },
         logo: { stringValue: currentLogoBase64 || "" },
         themeColor: { stringValue: themeColor },
+        promo: {
+          mapValue: {
+            fields: {
+              code: { stringValue: promoCode },
+              type: { stringValue: promoType },
+              value: { doubleValue: promoValue },
+            }
+          }
+        },
         items: { arrayValue: { values: formattedItems } },
       },
     };
@@ -288,11 +334,11 @@
       })
       .then(() => {
         updateStoreLinkBanner(storeId);
-        showStatus(`🚀 Published successfully! Click the banner link to view your store.`);
+        showStatus(`🚀 Published successfully!`);
       })
       .catch((err) => {
         console.error(err);
-        showStatus("Failed to publish to cloud. Check network or Firestore permissions.", true);
+        showStatus("Failed to publish to cloud.", true);
       });
   }
 
