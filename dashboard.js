@@ -17,22 +17,24 @@
 
   const prodNameInput = document.getElementById("prod-name");
   const prodPriceInput = document.getElementById("prod-price");
-  const prodImgInput = document.getElementById("prod-img");
+  const prodImgFileInput = document.getElementById("prod-img-file");
+  const prodPreviewImg = document.getElementById("prod-preview-img");
   const addProdBtn = document.getElementById("add-prod-btn");
   const productListContainer = document.getElementById("product-list-container");
   const prodCount = document.getElementById("prod-count");
 
   let localItems = [];
   let currentLogoBase64 = "";
+  let currentProdImgBase64 = "";
 
-  // Update Hex Label when Color Picker Changes
+  // Update Color Hex Label
   if (storeThemeColorInput) {
     storeThemeColorInput.addEventListener("input", (e) => {
       if (colorHexLabel) colorHexLabel.innerText = e.target.value;
     });
   }
 
-  // Client-Side Image Compressor
+  // Universal Client-Side Image Compressor
   function compressImage(file, maxWidth, maxHeight, quality, callback) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -61,14 +63,13 @@
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Export as lightweight compressed WebP data URL
         const dataUrl = canvas.toDataURL("image/webp", quality);
         callback(dataUrl);
       };
     };
   }
 
-  // Handle Logo Upload Event
+  // Handle Logo Upload
   if (storeLogoFileInput) {
     storeLogoFileInput.addEventListener("change", (e) => {
       const file = e.target.files[0];
@@ -81,7 +82,21 @@
     });
   }
 
+  // Handle Product Image Upload
+  if (prodImgFileInput) {
+    prodImgFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        compressImage(file, 500, 500, 0.8, (compressedBase64) => {
+          currentProdImgBase64 = compressedBase64;
+          if (prodPreviewImg) prodPreviewImg.src = compressedBase64;
+        });
+      }
+    });
+  }
+
   function showStatus(text, isError = false) {
+    if (!statusMsg) return;
     statusMsg.innerText = text;
     statusMsg.style.display = "block";
     statusMsg.style.backgroundColor = isError ? "#fef2f2" : "#f0fdf4";
@@ -90,7 +105,7 @@
     setTimeout(() => { statusMsg.style.display = "none"; }, 4000);
   }
 
-  // Fetch Store Settings & Products from Cloud
+  // Fetch Store Settings & Catalog from Firestore
   function fetchFromCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
     if (!storeId) {
@@ -137,9 +152,16 @@
       });
   }
 
+  // Render Product Catalog to DOM
   function renderProducts() {
+    if (!productListContainer) return;
     productListContainer.innerHTML = "";
-    prodCount.innerText = localItems.length;
+    if (prodCount) prodCount.innerText = localItems.length;
+
+    if (localItems.length === 0) {
+      productListContainer.innerHTML = `<p style="color: #94a3b8; font-size: 13px; text-align: center; padding: 12px 0;">No products in list yet.</p>`;
+      return;
+    }
 
     localItems.forEach((item, index) => {
       const row = document.createElement("div");
@@ -147,44 +169,59 @@
       row.innerHTML = `
         <img src="${item.img || 'https://placehold.co/100x100?text=No+Img'}" onerror="this.src='https://placehold.co/100x100?text=No+Img';">
         <div>
-          <strong style="font-size: 14px;">${item.name}</strong>
+          <strong style="font-size: 14px; color: #0f172a;">${item.name}</strong>
         </div>
-        <div style="font-weight: 600; font-size: 14px;">KSh ${item.price.toLocaleString()}</div>
+        <div style="font-weight: 600; font-size: 14px; color: #0f172a;">KSh ${item.price.toLocaleString()}</div>
         <button class="del-btn" data-index="${index}">🗑️</button>
       `;
       productListContainer.appendChild(row);
     });
 
+    // Delete item handlers
     document.querySelectorAll(".del-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        localItems.splice(e.target.dataset.index, 1);
+        const idx = e.target.getAttribute("data-index");
+        localItems.splice(idx, 1);
         renderProducts();
       });
     });
   }
 
-  // Add Product to Local State
+  // Add Product Action
   if (addProdBtn) {
-    addProdBtn.addEventListener("click", () => {
+    addProdBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+
       const name = prodNameInput.value.trim();
       const price = Number(prodPriceInput.value);
-      const img = prodImgInput.value.trim();
 
-      if (!name || isNaN(price)) {
+      if (!name || isNaN(price) || price <= 0) {
         showStatus("Please enter a valid product name and price.", true);
         return;
       }
 
-      localItems.push({ name, price, img });
+      const finalImg = currentProdImgBase64 || "https://placehold.co/200x200?text=No+Photo";
+
+      localItems.push({
+        name: name,
+        price: price,
+        img: finalImg
+      });
+
       renderProducts();
 
+      // Reset Form
       prodNameInput.value = "";
       prodPriceInput.value = "";
-      prodImgInput.value = "";
+      if (prodImgFileInput) prodImgFileInput.value = "";
+      currentProdImgBase64 = "";
+      if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
+
+      showStatus(`Added "${name}" to list.`);
     });
   }
 
-  // Sync Everything to Firestore
+  // Save Settings & Sync Catalog to Firestore
   function saveToCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
     const phone = storePhoneInput.value.trim();
