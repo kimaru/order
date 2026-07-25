@@ -93,57 +93,6 @@
       <button id="save-settings-btn" class="btn" style="width: 100%; margin-top: 10px;">💾 Save Store Settings</button>
     </div>
 
-    <!-- Promo & Volume Discount Settings Card -->
-    <div class="card">
-      <h2>🎟️ Discount & Promo Controls</h2>
-      
-      <!-- Promo Code Settings -->
-      <label style="font-weight: 700; color: #1e293b; margin-bottom: 8px; display: block;">1. Coupon Code Settings</label>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px;">
-        <div class="form-group">
-          <label>Coupon Code</label>
-          <input type="text" id="promo-code" placeholder="e.g. SAVE10">
-        </div>
-        <div class="form-group">
-          <label>Discount Scope</label>
-          <select id="promo-scope">
-            <option value="per_item">Per Item Unit</option>
-            <option value="cart_total">Cart Total</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Type & Value</label>
-          <div style="display: flex; gap: 4px;">
-            <select id="promo-type" style="width: 50%;">
-              <option value="percent">%</option>
-              <option value="flat">KSh</option>
-            </select>
-            <input type="number" id="promo-value" placeholder="10" style="width: 50%;">
-          </div>
-        </div>
-      </div>
-
-      <!-- Volume Tier Settings -->
-      <label style="font-weight: 700; color: #1e293b; margin-bottom: 8px; display: block; border-top: 1px dashed #e2e8f0; padding-top: 12px;">2. Volume / Bulk Discount Tier (Automatic)</label>
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-        <div class="form-group">
-          <label>Min. Total Items</label>
-          <input type="number" id="volume-min-qty" placeholder="e.g. 3 (0 = disabled)">
-        </div>
-        <div class="form-group">
-          <label>Discount Type</label>
-          <select id="volume-type">
-            <option value="percent">Percentage Off (%)</option>
-            <option value="flat">Flat Off Per Unit (KSh)</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>Value</label>
-          <input type="number" id="volume-value" placeholder="e.g. 15 or 200">
-        </div>
-      </div>
-    </div>
-
     <!-- Catalog Management Card -->
     <div class="card">
       <h2>📦 Manage Catalog (<span id="prod-count">0</span> items)</h2>
@@ -155,22 +104,22 @@
           <input type="text" id="prod-name" placeholder="e.g. Lavender Eau de Parfum 50ml">
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
           <div class="form-group">
-            <label>Regular Price (KSh)</label>
+            <label>Price (KSh)</label>
             <input type="number" id="prod-price" placeholder="3500">
           </div>
-          <div class="form-group">
-            <label>Sale Price (KSh - Optional)</label>
-            <input type="number" id="prod-sale-price" placeholder="e.g. 3000">
-          </div>
-        </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <!-- Dynamic Category Select Dropdown -->
           <div class="form-group">
             <label>Category</label>
-            <input type="text" id="prod-category" placeholder="Perfumes, Oils...">
+            <select id="prod-category-select">
+              <option value="General">General</option>
+              <option value="__ADD_NEW__">➕ Add another category...</option>
+            </select>
+            <input type="text" id="prod-custom-category" placeholder="Type new category..." style="display: none; margin-top: 6px;">
           </div>
+
           <div class="form-group">
             <label>Stock Status</label>
             <select id="prod-stock">
