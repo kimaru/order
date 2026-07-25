@@ -9,16 +9,6 @@
   const logoPreviewImg = document.getElementById("logo-preview-img");
   const storeThemeColorInput = document.getElementById("store-theme-color");
   const colorHexLabel = document.getElementById("color-hex-label");
-  
-  // Promo & Volume Elements
-  const promoCodeInput = document.getElementById("promo-code");
-  const promoScopeSelect = document.getElementById("promo-scope");
-  const promoTypeSelect = document.getElementById("promo-type");
-  const promoValueInput = document.getElementById("promo-value");
-
-  const volumeMinQtyInput = document.getElementById("volume-min-qty");
-  const volumeTypeSelect = document.getElementById("volume-type");
-  const volumeValueInput = document.getElementById("volume-value");
 
   const saveSettingsBtn = document.getElementById("save-settings-btn");
   const fetchCloudBtn = document.getElementById("fetch-cloud-btn");
@@ -27,8 +17,8 @@
 
   const prodNameInput = document.getElementById("prod-name");
   const prodPriceInput = document.getElementById("prod-price");
-  const prodSalePriceInput = document.getElementById("prod-sale-price");
-  const prodCategoryInput = document.getElementById("prod-category");
+  const prodCategorySelect = document.getElementById("prod-category-select");
+  const prodCustomCategoryInput = document.getElementById("prod-custom-category");
   const prodStockSelect = document.getElementById("prod-stock");
   const prodImgFileInput = document.getElementById("prod-img-file");
   const prodPreviewImg = document.getElementById("prod-preview-img");
@@ -39,10 +29,56 @@
   const copyLinkBtn = document.getElementById("copy-link-btn");
 
   let localItems = [];
+  let availableCategories = new Set(["General"]);
   let currentLogoBase64 = "";
   let currentProdImgBase64 = "";
   let currentGeneratedUrl = "";
   let editingIndex = -1;
+
+  // Handle Category Dropdown Toggle
+  if (prodCategorySelect) {
+    prodCategorySelect.addEventListener("change", (e) => {
+      if (e.target.value === "__ADD_NEW__") {
+        prodCustomCategoryInput.style.display = "block";
+        prodCustomCategoryInput.focus();
+      } else {
+        prodCustomCategoryInput.style.display = "none";
+        prodCustomCategoryInput.value = "";
+      }
+    });
+  }
+
+  // Populate & Refresh Category Dropdown Options
+  function refreshCategoryDropdown(selectedCategory = "General") {
+    if (!prodCategorySelect) return;
+
+    // Collect all existing categories from products
+    localItems.forEach(item => {
+      if (item.category) availableCategories.add(item.category);
+    });
+
+    prodCategorySelect.innerHTML = "";
+
+    availableCategories.forEach(cat => {
+      const opt = document.createElement("option");
+      opt.value = cat;
+      opt.innerText = cat;
+      prodCategorySelect.appendChild(opt);
+    });
+
+    const addNewOpt = document.createElement("option");
+    addNewOpt.value = "__ADD_NEW__";
+    addNewOpt.innerText = "➕ Add another category...";
+    prodCategorySelect.appendChild(addNewOpt);
+
+    if (availableCategories.has(selectedCategory)) {
+      prodCategorySelect.value = selectedCategory;
+      prodCustomCategoryInput.style.display = "none";
+    } else if (selectedCategory && selectedCategory !== "General") {
+      availableCategories.add(selectedCategory);
+      refreshCategoryDropdown(selectedCategory);
+    }
+  }
 
   function updateStoreLinkBanner(storeId) {
     const banner = document.getElementById("store-link-banner");
@@ -143,7 +179,7 @@
     setTimeout(() => { statusMsg.style.display = "none"; }, 5000);
   }
 
-  // Fetch Store Settings & Catalog from Firestore
+  // Fetch Store Data
   function fetchFromCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
     if (!storeId) {
@@ -166,19 +202,6 @@
         storeThemeColorInput.value = doc.fields.themeColor?.stringValue || "#10b981";
         if (colorHexLabel) colorHexLabel.innerText = storeThemeColorInput.value;
 
-        // Promo Code Parsing
-        const promoFields = doc.fields.promo?.mapValue?.fields || {};
-        promoCodeInput.value = promoFields.code?.stringValue || "";
-        promoScopeSelect.value = promoFields.scope?.stringValue || "per_item";
-        promoTypeSelect.value = promoFields.type?.stringValue || "percent";
-        promoValueInput.value = promoFields.value?.doubleValue || promoFields.value?.integerValue || "";
-
-        // Volume Discount Parsing
-        const volFields = doc.fields.volumeTier?.mapValue?.fields || {};
-        volumeMinQtyInput.value = volFields.minQty?.integerValue || volFields.minQty?.doubleValue || "";
-        volumeTypeSelect.value = volFields.type?.stringValue || "percent";
-        volumeValueInput.value = volFields.value?.doubleValue || volFields.value?.integerValue || "";
-
         currentLogoBase64 = doc.fields.logo?.stringValue || "";
         if (logoPreviewImg) {
           logoPreviewImg.src = currentLogoBase64 || "https://placehold.co/100x100?text=Logo";
@@ -190,7 +213,6 @@
           return {
             name: fields.name?.stringValue || "",
             price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
-            salePrice: Number(fields.salePrice?.doubleValue || fields.salePrice?.integerValue || 0),
             category: fields.category?.stringValue || "General",
             stock: fields.stock?.stringValue || "instock",
             img: fields.img?.stringValue || "",
@@ -199,6 +221,7 @@
 
         resetProductForm();
         renderProducts();
+        refreshCategoryDropdown();
         updateStoreLinkBanner(storeId);
         showStatus(`Loaded store "${storeId}" with ${localItems.length} products!`);
       })
@@ -227,10 +250,6 @@
         ? `<span class="badge badge-lowstock">Low Stock</span>`
         : `<span class="badge badge-outofstock">Out of Stock</span>`;
 
-      const priceDisplay = (item.salePrice && item.salePrice < item.price)
-        ? `<span style="text-decoration: line-through; font-size: 11px; color: #94a3b8;">KSh ${item.price.toLocaleString()}</span> <span style="color:#059669;">KSh ${item.salePrice.toLocaleString()}</span>`
-        : `KSh ${item.price.toLocaleString()}`;
-
       const row = document.createElement("div");
       row.className = "product-row";
       row.innerHTML = `
@@ -239,7 +258,7 @@
           <strong style="font-size: 14px; color: #0f172a;">${item.name}</strong>
           <div style="font-size: 12px; color: #64748b;">🏷️ ${item.category || 'General'} | ${stockBadge}</div>
         </div>
-        <div style="font-weight: 600; font-size: 13px; color: #0f172a; text-align: right;">${priceDisplay}</div>
+        <div style="font-weight: 600; font-size: 14px; color: #0f172a;">KSh ${item.price.toLocaleString()}</div>
         <div style="display: flex; gap: 6px; justify-content: flex-end;">
           <button class="edit-btn" data-index="${index}" title="Edit Product" style="background:none; border:none; cursor:pointer; font-size:15px;">✏️</button>
           <button class="del-btn" data-index="${index}" title="Delete Product">🗑️</button>
@@ -254,6 +273,7 @@
         localItems.splice(idx, 1);
         if (editingIndex == idx) resetProductForm();
         renderProducts();
+        refreshCategoryDropdown();
       });
     });
 
@@ -271,10 +291,10 @@
 
     prodNameInput.value = item.name;
     prodPriceInput.value = item.price;
-    prodSalePriceInput.value = item.salePrice || "";
-    prodCategoryInput.value = item.category || "General";
     prodStockSelect.value = item.stock || "instock";
     currentProdImgBase64 = item.img || "";
+
+    refreshCategoryDropdown(item.category || "General");
 
     if (prodPreviewImg) {
       prodPreviewImg.src = item.img || "https://placehold.co/100x100?text=Product";
@@ -291,27 +311,35 @@
     editingIndex = -1;
     prodNameInput.value = "";
     prodPriceInput.value = "";
-    prodSalePriceInput.value = "";
-    prodCategoryInput.value = "";
+    prodCustomCategoryInput.value = "";
+    prodCustomCategoryInput.style.display = "none";
     prodStockSelect.value = "instock";
     if (prodImgFileInput) prodImgFileInput.value = "";
     currentProdImgBase64 = "";
     if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
+
+    refreshCategoryDropdown();
 
     addProdBtn.innerText = "+ Add Product to List";
     addProdBtn.style.background = "#f1f5f9";
     addProdBtn.style.color = "#334155";
   }
 
+  // Add/Update Item in Local List
   if (addProdBtn) {
     addProdBtn.addEventListener("click", (e) => {
       e.preventDefault();
 
       const name = prodNameInput.value.trim();
       const price = Number(prodPriceInput.value);
-      const salePrice = Number(prodSalePriceInput.value) || 0;
-      const category = prodCategoryInput.value.trim() || "General";
       const stock = prodStockSelect.value;
+
+      // Determine category (Selected vs Custom typed)
+      let category = prodCategorySelect.value;
+      if (category === "__ADD_NEW__") {
+        category = prodCustomCategoryInput.value.trim();
+      }
+      if (!category) category = "General";
 
       if (!name || isNaN(price) || price <= 0) {
         showStatus("Please enter a valid product name and price.", true);
@@ -321,13 +349,14 @@
       const finalImg = currentProdImgBase64 || "https://placehold.co/200x200?text=No+Photo";
 
       if (editingIndex >= 0) {
-        localItems[editingIndex] = { name, price, salePrice, category, stock, img: finalImg };
+        localItems[editingIndex] = { name, price, category, stock, img: finalImg };
         showStatus(`Updated "${name}". Click "Publish All Changes" to sync online.`);
       } else {
-        localItems.push({ name, price, salePrice, category, stock, img: finalImg });
+        localItems.push({ name, price, category, stock, img: finalImg });
         showStatus(`Added "${name}" to list. Click "Publish All Changes" to sync online.`);
       }
 
+      availableCategories.add(category);
       renderProducts();
       resetProductForm();
     });
@@ -339,15 +368,6 @@
     const phone = storePhoneInput.value.trim();
     const slogan = storeSloganInput.value.trim();
     const themeColor = storeThemeColorInput.value || "#10b981";
-
-    const promoCode = promoCodeInput.value.trim().toUpperCase();
-    const promoScope = promoScopeSelect.value;
-    const promoType = promoTypeSelect.value;
-    const promoValue = Number(promoValueInput.value) || 0;
-
-    const volMinQty = Number(volumeMinQtyInput.value) || 0;
-    const volType = volumeTypeSelect.value;
-    const volValue = Number(volumeValueInput.value) || 0;
 
     if (!storeId) {
       showStatus("Please enter a Store ID.", true);
@@ -361,7 +381,6 @@
         fields: {
           name: { stringValue: item.name || "" },
           price: { doubleValue: Number(item.price) || 0 },
-          salePrice: { doubleValue: Number(item.salePrice) || 0 },
           category: { stringValue: item.category || "General" },
           stock: { stringValue: item.stock || "instock" },
           img: { stringValue: item.img || "" },
@@ -375,25 +394,6 @@
         slogan: { stringValue: slogan || "" },
         logo: { stringValue: currentLogoBase64 || "" },
         themeColor: { stringValue: themeColor },
-        promo: {
-          mapValue: {
-            fields: {
-              code: { stringValue: promoCode },
-              scope: { stringValue: promoScope },
-              type: { stringValue: promoType },
-              value: { doubleValue: promoValue },
-            }
-          }
-        },
-        volumeTier: {
-          mapValue: {
-            fields: {
-              minQty: { integerValue: volMinQty },
-              type: { stringValue: volType },
-              value: { doubleValue: volValue },
-            }
-          }
-        },
         items: { arrayValue: { values: formattedItems } },
       },
     };
