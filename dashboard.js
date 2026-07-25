@@ -35,6 +35,9 @@
   let currentLogoBase64 = "";
   let currentProdImgBase64 = "";
   let currentGeneratedUrl = "";
+  
+  // Track item being edited (-1 means adding new item)
+  let editingIndex = -1;
 
   // Dynamic Store Link Generator & Copy Handler
   function updateStoreLinkBanner(storeId) {
@@ -62,7 +65,6 @@
     });
   }
 
-  // Color Hex Display Listener
   if (storeThemeColorInput) {
     storeThemeColorInput.addEventListener("input", (e) => {
       if (colorHexLabel) colorHexLabel.innerText = e.target.value;
@@ -161,7 +163,6 @@
         storeThemeColorInput.value = doc.fields.themeColor?.stringValue || "#10b981";
         if (colorHexLabel) colorHexLabel.innerText = storeThemeColorInput.value;
 
-        // Promo Code Parsing
         const promoFields = doc.fields.promo?.mapValue?.fields || {};
         promoCodeInput.value = promoFields.code?.stringValue || "";
         promoTypeSelect.value = promoFields.type?.stringValue || "percent";
@@ -184,6 +185,7 @@
           };
         });
 
+        resetProductForm();
         renderProducts();
         updateStoreLinkBanner(storeId);
         showStatus(`Loaded store "${storeId}" with ${localItems.length} products!`);
@@ -222,21 +224,72 @@
           <div style="font-size: 12px; color: #64748b;">🏷️ ${item.category || 'General'} | ${stockBadge}</div>
         </div>
         <div style="font-weight: 600; font-size: 14px; color: #0f172a;">KSh ${item.price.toLocaleString()}</div>
-        <button class="del-btn" data-index="${index}">🗑️</button>
+        <div style="display: flex; gap: 6px;">
+          <button class="edit-btn" data-index="${index}" title="Edit Product" style="background:none; border:none; cursor:pointer; font-size:15px;">✏️</button>
+          <button class="del-btn" data-index="${index}" title="Delete Product">🗑️</button>
+        </div>
       `;
       productListContainer.appendChild(row);
     });
 
+    // Delete Event Handlers
     document.querySelectorAll(".del-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = e.target.getAttribute("data-index");
         localItems.splice(idx, 1);
+        if (editingIndex == idx) resetProductForm();
         renderProducts();
+      });
+    });
+
+    // Edit Event Handlers
+    document.querySelectorAll(".edit-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const idx = Number(e.target.getAttribute("data-index"));
+        startEditingProduct(idx);
       });
     });
   }
 
-  // Add Item to Local List
+  // Start Editing a Product
+  function startEditingProduct(index) {
+    editingIndex = index;
+    const item = localItems[index];
+
+    prodNameInput.value = item.name;
+    prodPriceInput.value = item.price;
+    prodCategoryInput.value = item.category || "General";
+    prodStockSelect.value = item.stock || "instock";
+    currentProdImgBase64 = item.img || "";
+
+    if (prodPreviewImg) {
+      prodPreviewImg.src = item.img || "https://placehold.co/100x100?text=Product";
+    }
+
+    addProdBtn.innerText = "💾 Update Product";
+    addProdBtn.style.background = "#2563eb";
+    addProdBtn.style.color = "white";
+
+    prodNameInput.focus();
+  }
+
+  // Reset Product Form back to Add Mode
+  function resetProductForm() {
+    editingIndex = -1;
+    prodNameInput.value = "";
+    prodPriceInput.value = "";
+    prodCategoryInput.value = "";
+    prodStockSelect.value = "instock";
+    if (prodImgFileInput) prodImgFileInput.value = "";
+    currentProdImgBase64 = "";
+    if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
+
+    addProdBtn.innerText = "+ Add Product to List";
+    addProdBtn.style.background = "#f1f5f9";
+    addProdBtn.style.color = "#334155";
+  }
+
+  // Add/Update Item in Local List
   if (addProdBtn) {
     addProdBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -253,24 +306,18 @@
 
       const finalImg = currentProdImgBase64 || "https://placehold.co/200x200?text=No+Photo";
 
-      localItems.push({
-        name: name,
-        price: price,
-        category: category,
-        stock: stock,
-        img: finalImg
-      });
+      if (editingIndex >= 0) {
+        // Update Existing Item
+        localItems[editingIndex] = { name, price, category, stock, img: finalImg };
+        showStatus(`Updated "${name}". Click "Publish All Changes" to sync online.`);
+      } else {
+        // Add New Item
+        localItems.push({ name, price, category, stock, img: finalImg });
+        showStatus(`Added "${name}" to list. Click "Publish All Changes" to sync online.`);
+      }
 
       renderProducts();
-
-      prodNameInput.value = "";
-      prodPriceInput.value = "";
-      prodCategoryInput.value = "";
-      if (prodImgFileInput) prodImgFileInput.value = "";
-      currentProdImgBase64 = "";
-      if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
-
-      showStatus(`Added "${name}" to list. Click "Publish All Changes" to save online.`);
+      resetProductForm();
     });
   }
 
@@ -334,7 +381,7 @@
       })
       .then(() => {
         updateStoreLinkBanner(storeId);
-        showStatus(`🚀 Published successfully!`);
+        showStatus(`🚀 Published successfully! All changes live on storefront.`);
       })
       .catch((err) => {
         console.error(err);
