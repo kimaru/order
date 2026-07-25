@@ -10,9 +10,15 @@
   const storeThemeColorInput = document.getElementById("store-theme-color");
   const colorHexLabel = document.getElementById("color-hex-label");
   
+  // Promo & Volume Elements
   const promoCodeInput = document.getElementById("promo-code");
+  const promoScopeSelect = document.getElementById("promo-scope");
   const promoTypeSelect = document.getElementById("promo-type");
   const promoValueInput = document.getElementById("promo-value");
+
+  const volumeMinQtyInput = document.getElementById("volume-min-qty");
+  const volumeTypeSelect = document.getElementById("volume-type");
+  const volumeValueInput = document.getElementById("volume-value");
 
   const saveSettingsBtn = document.getElementById("save-settings-btn");
   const fetchCloudBtn = document.getElementById("fetch-cloud-btn");
@@ -21,6 +27,7 @@
 
   const prodNameInput = document.getElementById("prod-name");
   const prodPriceInput = document.getElementById("prod-price");
+  const prodSalePriceInput = document.getElementById("prod-sale-price");
   const prodCategoryInput = document.getElementById("prod-category");
   const prodStockSelect = document.getElementById("prod-stock");
   const prodImgFileInput = document.getElementById("prod-img-file");
@@ -35,11 +42,8 @@
   let currentLogoBase64 = "";
   let currentProdImgBase64 = "";
   let currentGeneratedUrl = "";
-  
-  // Track item being edited (-1 means adding new item)
   let editingIndex = -1;
 
-  // Dynamic Store Link Generator & Copy Handler
   function updateStoreLinkBanner(storeId) {
     const banner = document.getElementById("store-link-banner");
     const urlText = document.getElementById("store-url-text");
@@ -71,7 +75,6 @@
     });
   }
 
-  // Client-Side Image Compressor
   function compressImage(file, maxWidth, maxHeight, quality, callback) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -163,10 +166,18 @@
         storeThemeColorInput.value = doc.fields.themeColor?.stringValue || "#10b981";
         if (colorHexLabel) colorHexLabel.innerText = storeThemeColorInput.value;
 
+        // Promo Code Parsing
         const promoFields = doc.fields.promo?.mapValue?.fields || {};
         promoCodeInput.value = promoFields.code?.stringValue || "";
+        promoScopeSelect.value = promoFields.scope?.stringValue || "per_item";
         promoTypeSelect.value = promoFields.type?.stringValue || "percent";
         promoValueInput.value = promoFields.value?.doubleValue || promoFields.value?.integerValue || "";
+
+        // Volume Discount Parsing
+        const volFields = doc.fields.volumeTier?.mapValue?.fields || {};
+        volumeMinQtyInput.value = volFields.minQty?.integerValue || volFields.minQty?.doubleValue || "";
+        volumeTypeSelect.value = volFields.type?.stringValue || "percent";
+        volumeValueInput.value = volFields.value?.doubleValue || volFields.value?.integerValue || "";
 
         currentLogoBase64 = doc.fields.logo?.stringValue || "";
         if (logoPreviewImg) {
@@ -179,6 +190,7 @@
           return {
             name: fields.name?.stringValue || "",
             price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
+            salePrice: Number(fields.salePrice?.doubleValue || fields.salePrice?.integerValue || 0),
             category: fields.category?.stringValue || "General",
             stock: fields.stock?.stringValue || "instock",
             img: fields.img?.stringValue || "",
@@ -215,6 +227,10 @@
         ? `<span class="badge badge-lowstock">Low Stock</span>`
         : `<span class="badge badge-outofstock">Out of Stock</span>`;
 
+      const priceDisplay = (item.salePrice && item.salePrice < item.price)
+        ? `<span style="text-decoration: line-through; font-size: 11px; color: #94a3b8;">KSh ${item.price.toLocaleString()}</span> <span style="color:#059669;">KSh ${item.salePrice.toLocaleString()}</span>`
+        : `KSh ${item.price.toLocaleString()}`;
+
       const row = document.createElement("div");
       row.className = "product-row";
       row.innerHTML = `
@@ -223,8 +239,8 @@
           <strong style="font-size: 14px; color: #0f172a;">${item.name}</strong>
           <div style="font-size: 12px; color: #64748b;">🏷️ ${item.category || 'General'} | ${stockBadge}</div>
         </div>
-        <div style="font-weight: 600; font-size: 14px; color: #0f172a;">KSh ${item.price.toLocaleString()}</div>
-        <div style="display: flex; gap: 6px;">
+        <div style="font-weight: 600; font-size: 13px; color: #0f172a; text-align: right;">${priceDisplay}</div>
+        <div style="display: flex; gap: 6px; justify-content: flex-end;">
           <button class="edit-btn" data-index="${index}" title="Edit Product" style="background:none; border:none; cursor:pointer; font-size:15px;">✏️</button>
           <button class="del-btn" data-index="${index}" title="Delete Product">🗑️</button>
         </div>
@@ -232,7 +248,6 @@
       productListContainer.appendChild(row);
     });
 
-    // Delete Event Handlers
     document.querySelectorAll(".del-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = e.target.getAttribute("data-index");
@@ -242,7 +257,6 @@
       });
     });
 
-    // Edit Event Handlers
     document.querySelectorAll(".edit-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = Number(e.target.getAttribute("data-index"));
@@ -251,13 +265,13 @@
     });
   }
 
-  // Start Editing a Product
   function startEditingProduct(index) {
     editingIndex = index;
     const item = localItems[index];
 
     prodNameInput.value = item.name;
     prodPriceInput.value = item.price;
+    prodSalePriceInput.value = item.salePrice || "";
     prodCategoryInput.value = item.category || "General";
     prodStockSelect.value = item.stock || "instock";
     currentProdImgBase64 = item.img || "";
@@ -273,11 +287,11 @@
     prodNameInput.focus();
   }
 
-  // Reset Product Form back to Add Mode
   function resetProductForm() {
     editingIndex = -1;
     prodNameInput.value = "";
     prodPriceInput.value = "";
+    prodSalePriceInput.value = "";
     prodCategoryInput.value = "";
     prodStockSelect.value = "instock";
     if (prodImgFileInput) prodImgFileInput.value = "";
@@ -289,13 +303,13 @@
     addProdBtn.style.color = "#334155";
   }
 
-  // Add/Update Item in Local List
   if (addProdBtn) {
     addProdBtn.addEventListener("click", (e) => {
       e.preventDefault();
 
       const name = prodNameInput.value.trim();
       const price = Number(prodPriceInput.value);
+      const salePrice = Number(prodSalePriceInput.value) || 0;
       const category = prodCategoryInput.value.trim() || "General";
       const stock = prodStockSelect.value;
 
@@ -307,12 +321,10 @@
       const finalImg = currentProdImgBase64 || "https://placehold.co/200x200?text=No+Photo";
 
       if (editingIndex >= 0) {
-        // Update Existing Item
-        localItems[editingIndex] = { name, price, category, stock, img: finalImg };
+        localItems[editingIndex] = { name, price, salePrice, category, stock, img: finalImg };
         showStatus(`Updated "${name}". Click "Publish All Changes" to sync online.`);
       } else {
-        // Add New Item
-        localItems.push({ name, price, category, stock, img: finalImg });
+        localItems.push({ name, price, salePrice, category, stock, img: finalImg });
         showStatus(`Added "${name}" to list. Click "Publish All Changes" to sync online.`);
       }
 
@@ -329,8 +341,13 @@
     const themeColor = storeThemeColorInput.value || "#10b981";
 
     const promoCode = promoCodeInput.value.trim().toUpperCase();
+    const promoScope = promoScopeSelect.value;
     const promoType = promoTypeSelect.value;
     const promoValue = Number(promoValueInput.value) || 0;
+
+    const volMinQty = Number(volumeMinQtyInput.value) || 0;
+    const volType = volumeTypeSelect.value;
+    const volValue = Number(volumeValueInput.value) || 0;
 
     if (!storeId) {
       showStatus("Please enter a Store ID.", true);
@@ -344,6 +361,7 @@
         fields: {
           name: { stringValue: item.name || "" },
           price: { doubleValue: Number(item.price) || 0 },
+          salePrice: { doubleValue: Number(item.salePrice) || 0 },
           category: { stringValue: item.category || "General" },
           stock: { stringValue: item.stock || "instock" },
           img: { stringValue: item.img || "" },
@@ -361,8 +379,18 @@
           mapValue: {
             fields: {
               code: { stringValue: promoCode },
+              scope: { stringValue: promoScope },
               type: { stringValue: promoType },
               value: { doubleValue: promoValue },
+            }
+          }
+        },
+        volumeTier: {
+          mapValue: {
+            fields: {
+              minQty: { integerValue: volMinQty },
+              type: { stringValue: volType },
+              value: { doubleValue: volValue },
             }
           }
         },
