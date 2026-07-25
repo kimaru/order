@@ -10,7 +10,7 @@
   const inventoryContainer = document.getElementById("inventory-container");
   const addItemBtn = document.getElementById("add-item-btn");
   const generateBtn = document.getElementById("generate-btn");
-  const saveBtn = document.getElementById("save-btn");
+  const fetchCloudBtn = document.getElementById("fetch-cloud-btn");
   const linkBox = document.getElementById("link-box");
   const storeUrlAnchor = document.getElementById("store-url");
 
@@ -25,39 +25,39 @@
   if (savedInventory) {
     try {
       inventory = JSON.parse(savedInventory);
-    } catch (e) {      inventory = [];
+    } catch (e) {
+      inventory = [];
     }
   }
 
-  // If we have an initial store ID, try fetching live cloud data right away
+  // If we have a saved Store ID, fetch latest cloud data on startup
   if (savedStoreId) {
-    fetchStoreFromCloud(savedStoreId);
+    fetchStoreFromCloud(savedStoreId, false);
   } else {
     renderInventory();
   }
 
-  // 2. Cloud Sync: Automatically fetch from Firebase when Store ID changes
-  let debounceTimer;
-  storeIdInput.addEventListener("input", () => {
-    clearTimeout(debounceTimer);
-    const id = storeIdInput.value.trim().toLowerCase();
-    if (!id) return;
+  // 2. Cloud Sync Function (Handles both auto-sync and manual button click)
+  function fetchStoreFromCloud(storeId, isManualClick = false) {
+    if (!storeId) {
+      if (isManualClick) alert("Please enter a Store ID first.");
+      return;
+    }
 
-    // Debounce to avoid spamming reads while typing
-    debounceTimer = setTimeout(() => {
-      fetchStoreFromCloud(id);
-    }, 600);
-  });
-
-  // Fetch store data from Firestore REST API
-  function fetchStoreFromCloud(storeId) {
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
+
+    if (isManualClick && fetchCloudBtn) {
+      fetchCloudBtn.innerText = "⏳ Syncing...";
+      fetchCloudBtn.disabled = true;
+    }
 
     fetch(firestoreUrl)
       .then((res) => {
         if (!res.ok) {
-          if (res.status === 404) {
-            console.log("New store ID detected — starting with fresh inventory.");
+          if (res.status === 404 && isManualClick) {
+            alert(`No existing cloud store found with ID "${storeId}". Starting fresh!`);
+          } else if (!res.ok && isManualClick) {
+            alert(`Error fetching store: HTTP ${res.status}`);
           }
           return null;
         }
@@ -66,12 +66,12 @@
       .then((doc) => {
         if (!doc || !doc.fields) return;
 
-        // Pull Cloud Phone Number
+        // Sync Phone Number
         if (doc.fields.phone && doc.fields.phone.stringValue) {
           phoneInput.value = doc.fields.phone.stringValue;
         }
 
-        // Pull Cloud Inventory Items
+        // Sync Inventory Array
         const rawItems = doc.fields.items?.arrayValue?.values || [];
         inventory = rawItems.map((item) => {
           const mapFields = item.mapValue?.fields || {};
@@ -82,12 +82,45 @@
           };
         });
 
-        // Save fresh draft & update UI
+        // Persist local draft & re-render view
         saveLocalDraft();
         renderInventory();
+
+        if (isManualClick) {
+          alert(`✅ Cloud sync complete! Showing live inventory for "${storeId}".`);
+        }
       })
-      .catch((err) => console.error("Cloud sync error:", err));
+      .catch((err) => {
+        console.error("Cloud sync error:", err);
+        if (isManualClick) alert("Failed to sync from cloud: " + err.message);
+      })
+      .finally(() => {
+        if (isManualClick && fetchCloudBtn) {
+          fetchCloudBtn.innerText = "🔄 Fetch from Cloud";
+          fetchCloudBtn.disabled = false;
+        }
+      });
   }
+
+  // Event Listener for Manual "Fetch from Cloud" Button
+  if (fetchCloudBtn) {
+    fetchCloudBtn.addEventListener("click", () => {
+      const id = storeIdInput.value.trim().toLowerCase();
+      fetchStoreFromCloud(id, true);
+    });
+  }
+
+  // Debounced auto-fetch when typing new store handle
+  let debounceTimer;
+  storeIdInput.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    const id = storeIdInput.value.trim().toLowerCase();
+    if (!id) return;
+
+    debounceTimer = setTimeout(() => {
+      fetchStoreFromCloud(id, false);
+    }, 800);
+  });
 
   // 3. Render Product Cards in Dashboard
   function renderInventory() {
@@ -243,29 +276,21 @@
       });
   }
 
-  // 5. Local Draft Helper
+  // 5. Save Local Draft Helper
   function saveLocalDraft() {
     localStorage.setItem("draft_store_id", storeIdInput.value.trim().toLowerCase());
     localStorage.setItem("draft_phone", phoneInput.value.trim());
     localStorage.setItem("draft_inventory", JSON.stringify(inventory));
   }
 
-  // 6. Manual Save Draft Button
-  if (saveBtn) {
-    saveBtn.addEventListener("click", () => {
-      saveLocalDraft();
-      alert("Draft saved locally on this browser!");
-    });
-  }
-
-  // 7. Add New Product Item
+  // 6. Add New Product Item
   addItemBtn.addEventListener("click", () => {
     inventory.push({ name: "", price: 0, img: "" });
     saveLocalDraft();
     renderInventory();
   });
 
-  // 8. Publish to Firestore Cloud
+  // 7. Publish to Firestore Cloud
   generateBtn.addEventListener("click", () => {
     const storeId = storeIdInput.value.trim().toLowerCase();
     const phone = phoneInput.value.trim();
