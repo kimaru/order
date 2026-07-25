@@ -93,6 +93,22 @@
       <button id="save-settings-btn" class="btn" style="width: 100%; margin-top: 10px;">💾 Save Store Settings</button>
     </div>
 
+    <!-- Batch Category Management Card -->
+    <div class="card">
+      <h2>🏷️ Category Manager</h2>
+      <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; flex-wrap: wrap;">
+        <select id="manage-category-select" style="flex: 1; min-width: 200px;">
+          <option value="">Select a category to manage...</option>
+        </select>
+        <button id="rename-cat-btn" class="btn btn-secondary">✏️ Rename</button>
+        <button id="delete-cat-btn" class="btn" style="background: #ef4444;">🗑️ Delete Category</button>
+      </div>
+      <p style="font-size: 12px; color: #64748b;">
+        • <strong>Rename:</strong> Changes the category name across all assigned products.<br>
+        • <strong>Delete:</strong> Removes the category tag and moves assigned products to "General".
+      </p>
+    </div>
+
     <!-- Catalog Management Card -->
     <div class="card">
       <h2>📦 Manage Catalog (<span id="prod-count">0</span> items)</h2>
