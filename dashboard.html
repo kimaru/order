@@ -14,21 +14,26 @@
     
     .form-group { margin-bottom: 14px; }
     label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #475569; }
-    input[type="text"], input[type="number"], input[type="color"] {
-      width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none;
+    input[type="text"], input[type="number"], input[type="color"], select {
+      width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; outline: none; background: white;
     }
-    input[type="text"]:focus, input[type="number"]:focus { border-color: #10b981; }
+    input[type="text"]:focus, input[type="number"]:focus, select:focus { border-color: #10b981; }
 
-    .btn { background: #10b981; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; }
+    .btn { background: #10b981; color: white; border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
     .btn:hover { opacity: 0.9; }
     .btn-secondary { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
     
     .flex-gap { display: flex; gap: 10px; align-items: center; }
     .preview-box { width: 48px; height: 48px; border-radius: 8px; border: 1px solid #e2e8f0; object-fit: cover; background: #f8fafc; }
     
-    .product-row { display: grid; grid-template-columns: 40px 1fr 100px 40px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+    .product-row { display: grid; grid-template-columns: 40px 1fr auto 40px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
     .product-row img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; background: #f1f5f9; }
     .del-btn { background: none; border: none; font-size: 16px; cursor: pointer; color: #ef4444; }
+
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600; }
+    .badge-instock { background: #dcfce7; color: #166534; }
+    .badge-lowstock { background: #fef9c3; color: #854d0e; }
+    .badge-outofstock { background: #fee2e2; color: #991b1b; }
 
     #status-msg { padding: 12px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; border: 1px solid transparent; }
   </style>
@@ -38,15 +43,16 @@
   <div class="container">
     <div id="status-msg"></div>
 
-    <!-- Live Storefront Link Banner -->
+    <!-- Live Storefront Link Banner with Share/Copy -->
     <div id="store-link-banner" style="display: none; background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-bottom: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
       <div>
         <span style="font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">Your Live Storefront Link</span>
         <p id="store-url-text" style="font-size: 14px; font-weight: 600; color: #1e3a8a; margin-top: 2px; word-break: break-all;">index.html?store=your-store-id</p>
       </div>
-      <a id="visit-store-btn" href="#" target="_blank" class="btn" style="background: #2563eb; color: white; text-decoration: none; padding: 10px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
-        🛍️ Visit Storefront
-      </a>
+      <div class="flex-gap">
+        <button id="copy-link-btn" class="btn btn-secondary" style="padding: 8px 12px; font-size: 13px;">📋 Copy Link</button>
+        <a id="visit-store-btn" href="#" target="_blank" class="btn" style="background: #2563eb; color: white; padding: 8px 14px; font-size: 13px;">🛍️ Visit Store</a>
+      </div>
     </div>
 
     <!-- Store Settings & Branding Card -->
@@ -87,6 +93,28 @@
       <button id="save-settings-btn" class="btn" style="width: 100%; margin-top: 10px;">💾 Save Store Settings</button>
     </div>
 
+    <!-- Promo / Discount Code Settings Card -->
+    <div class="card">
+      <h2>🎟️ Discount / Promo Code</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+        <div class="form-group">
+          <label>Coupon Code</label>
+          <input type="text" id="promo-code" placeholder="e.g. SAVE10">
+        </div>
+        <div class="form-group">
+          <label>Discount Type</label>
+          <select id="promo-type">
+            <option value="percent">Percentage (%)</option>
+            <option value="flat">Flat Amount (KSh)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Discount Value</label>
+          <input type="number" id="promo-value" placeholder="e.g. 10 or 500">
+        </div>
+      </div>
+    </div>
+
     <!-- Catalog Management Card -->
     <div class="card">
       <h2>📦 Manage Catalog (<span id="prod-count">0</span> items)</h2>
@@ -98,9 +126,23 @@
           <input type="text" id="prod-name" placeholder="e.g. Lavender Eau de Parfum 50ml">
         </div>
 
-        <div class="form-group">
-          <label>Price (KSh)</label>
-          <input type="number" id="prod-price" placeholder="e.g. 3500">
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label>Price (KSh)</label>
+            <input type="number" id="prod-price" placeholder="3500">
+          </div>
+          <div class="form-group">
+            <label>Category</label>
+            <input type="text" id="prod-category" placeholder="Perfumes, Oils...">
+          </div>
+          <div class="form-group">
+            <label>Stock Status</label>
+            <select id="prod-stock">
+              <option value="instock">In Stock</option>
+              <option value="lowstock">Low Stock</option>
+              <option value="outofstock">Out of Stock</option>
+            </select>
+          </div>
         </div>
 
         <div class="form-group">
