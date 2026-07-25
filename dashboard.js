@@ -1,312 +1,208 @@
 (function () {
   const PROJECT_ID = "whatsapp-eco-engine-80882";
-  const IMGBB_API_KEY = "6d0b64d39c0618037f48c0840b3cb1c9"; // Replace with your ImgBB key if different
 
-  let inventory = [];
-
-  // DOM Elements
-  const storeIdInput = document.getElementById("store-id");
-  const phoneInput = document.getElementById("phone");
-  const inventoryContainer = document.getElementById("inventory-container");
-  const addItemBtn = document.getElementById("add-item-btn");
-  const generateBtn = document.getElementById("generate-btn");
+  // Elements
+  const storeIdInput = document.getElementById("store-id-input");
+  const storePhoneInput = document.getElementById("store-phone-input");
+  const storeSloganInput = document.getElementById("store-slogan-input");
+  const storeLogoFileInput = document.getElementById("store-logo-file");
+  const logoPreviewImg = document.getElementById("logo-preview-img");
+  const storeThemeColorInput = document.getElementById("store-theme-color");
+  const colorHexLabel = document.getElementById("color-hex-label");
+  
+  const saveSettingsBtn = document.getElementById("save-settings-btn");
   const fetchCloudBtn = document.getElementById("fetch-cloud-btn");
-  const linkBox = document.getElementById("link-box");
-  const storeUrlAnchor = document.getElementById("store-url");
+  const syncCloudBtn = document.getElementById("sync-cloud-btn");
+  const statusMsg = document.getElementById("status-msg");
 
-  // 1. Initial Load from Local Draft (if returning on same device)
-  const savedStoreId = localStorage.getItem("draft_store_id") || "";
-  const savedPhone = localStorage.getItem("draft_phone") || "";
-  const savedInventory = localStorage.getItem("draft_inventory");
+  const prodNameInput = document.getElementById("prod-name");
+  const prodPriceInput = document.getElementById("prod-price");
+  const prodImgInput = document.getElementById("prod-img");
+  const addProdBtn = document.getElementById("add-prod-btn");
+  const productListContainer = document.getElementById("product-list-container");
+  const prodCount = document.getElementById("prod-count");
 
-  if (savedStoreId) storeIdInput.value = savedStoreId;
-  if (savedPhone) phoneInput.value = savedPhone;
+  let localItems = [];
+  let currentLogoBase64 = "";
 
-  if (savedInventory) {
-    try {
-      inventory = JSON.parse(savedInventory);
-    } catch (e) {
-      inventory = [];
-    }
-  }
-
-  // If we have a saved Store ID, fetch latest cloud data on startup
-  if (savedStoreId) {
-    fetchStoreFromCloud(savedStoreId, false);
-  } else {
-    renderInventory();
-  }
-
-  // 2. Cloud Sync Function (Handles both auto-sync and manual button click)
-  function fetchStoreFromCloud(storeId, isManualClick = false) {
-    if (!storeId) {
-      if (isManualClick) alert("Please enter a Store ID first.");
-      return;
-    }
-
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
-
-    if (isManualClick && fetchCloudBtn) {
-      fetchCloudBtn.innerText = "⏳ Syncing...";
-      fetchCloudBtn.disabled = true;
-    }
-
-    fetch(firestoreUrl)
-      .then((res) => {
-        if (!res.ok) {
-          if (res.status === 404 && isManualClick) {
-            alert(`No existing cloud store found with ID "${storeId}". Starting fresh!`);
-          } else if (!res.ok && isManualClick) {
-            alert(`Error fetching store: HTTP ${res.status}`);
-          }
-          return null;
-        }
-        return res.json();
-      })
-      .then((doc) => {
-        if (!doc || !doc.fields) return;
-
-        // Sync Phone Number
-        if (doc.fields.phone && doc.fields.phone.stringValue) {
-          phoneInput.value = doc.fields.phone.stringValue;
-        }
-
-        // Sync Inventory Array
-        const rawItems = doc.fields.items?.arrayValue?.values || [];
-        inventory = rawItems.map((item) => {
-          const mapFields = item.mapValue?.fields || {};
-          return {
-            name: mapFields.name?.stringValue || "",
-            price: Number(mapFields.price?.doubleValue || mapFields.price?.integerValue || 0),
-            img: mapFields.img?.stringValue || "",
-          };
-        });
-
-        // Persist local draft & re-render view
-        saveLocalDraft();
-        renderInventory();
-
-        if (isManualClick) {
-          alert(`✅ Cloud sync complete! Showing live inventory for "${storeId}".`);
-        }
-      })
-      .catch((err) => {
-        console.error("Cloud sync error:", err);
-        if (isManualClick) alert("Failed to sync from cloud: " + err.message);
-      })
-      .finally(() => {
-        if (isManualClick && fetchCloudBtn) {
-          fetchCloudBtn.innerText = "🔄 Fetch from Cloud";
-          fetchCloudBtn.disabled = false;
-        }
-      });
-  }
-
-  // Event Listener for Manual "Fetch from Cloud" Button
-  if (fetchCloudBtn) {
-    fetchCloudBtn.addEventListener("click", () => {
-      const id = storeIdInput.value.trim().toLowerCase();
-      fetchStoreFromCloud(id, true);
+  // Update Hex Label when Color Picker Changes
+  if (storeThemeColorInput) {
+    storeThemeColorInput.addEventListener("input", (e) => {
+      if (colorHexLabel) colorHexLabel.innerText = e.target.value;
     });
   }
 
-  // Debounced auto-fetch when typing new store handle
-  let debounceTimer;
-  storeIdInput.addEventListener("input", () => {
-    clearTimeout(debounceTimer);
-    const id = storeIdInput.value.trim().toLowerCase();
-    if (!id) return;
-
-    debounceTimer = setTimeout(() => {
-      fetchStoreFromCloud(id, false);
-    }, 800);
-  });
-
-  // 3. Render Product Cards in Dashboard
-  function renderInventory() {
-    inventoryContainer.innerHTML = "";
-
-    if (inventory.length === 0) {
-      inventoryContainer.innerHTML = `
-        <div style="text-align: center; padding: 30px; color: #94a3b8; font-size: 14px;">
-          No items added yet. Click <strong>+ Add New Item</strong> to build your catalog.
-        </div>`;
-      return;
-    }
-
-    inventory.forEach((item, index) => {
-      const card = document.createElement("div");
-      card.className = "product-row-item";
-
-      const imgSrc = item.img || "https://placehold.co/100x100?text=No+Image";
-
-      card.innerHTML = `
-        <div class="item-media-box">
-          <img src="${imgSrc}" class="row-preview-img" id="img-preview-${index}" onerror="this.src='https://placehold.co/100x100?text=No+Image';">
-          <div class="upload-btn-wrapper">
-            <button class="btn">📸 Photo</button>
-            <input type="file" accept="image/*" class="image-uploader" data-index="${index}">
-          </div>
-        </div>
-
-        <div class="form-group-item" style="flex: 2;">
-          <label>Product Name</label>
-          <input type="text" class="item-name" data-index="${index}" value="${item.name}" placeholder="e.g. Vanilla Perfume 50ml">
-        </div>
-
-        <div class="form-group-item" style="flex: 1;">
-          <label>Price</label>
-          <input type="number" class="item-price" data-index="${index}" value="${item.price || ''}" placeholder="0.00">
-        </div>
-
-        <button class="btn btn-danger remove-btn" data-index="${index}">🗑️</button>
-      `;
-
-      inventoryContainer.appendChild(card);
-    });
-
-    attachEventListeners();
-  }
-
-  // 4. Input Change Listeners & Image Compression/Upload
-  function attachEventListeners() {
-    // Name input change
-    document.querySelectorAll(".item-name").forEach((input) => {
-      input.addEventListener("input", (e) => {
-        const idx = e.target.dataset.index;
-        inventory[idx].name = e.target.value;
-        saveLocalDraft();
-      });
-    });
-
-    // Price input change
-    document.querySelectorAll(".item-price").forEach((input) => {
-      input.addEventListener("input", (e) => {
-        const idx = e.target.dataset.index;
-        inventory[idx].price = Number(e.target.value);
-        saveLocalDraft();
-      });
-    });
-
-    // Remove item
-    document.querySelectorAll(".remove-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const idx = e.target.dataset.index;
-        inventory.splice(idx, 1);
-        saveLocalDraft();
-        renderInventory();
-      });
-    });
-
-    // Image Upload & Canvas Compression
-    document.querySelectorAll(".image-uploader").forEach((fileInput) => {
-      fileInput.addEventListener("change", (e) => {
-        const file = e.target.files[0];
-        const idx = e.target.dataset.index;
-        if (!file) return;
-
-        const previewImg = document.getElementById(`img-preview-${idx}`);
-        previewImg.style.opacity = "0.4";
-
-        // Compress image using Canvas before uploading
-        compressImage(file, 800, 0.7, (compressedBlob) => {
-          uploadToImgBB(compressedBlob, (uploadedUrl) => {
-            previewImg.style.opacity = "1";
-            if (uploadedUrl) {
-              inventory[idx].img = uploadedUrl;
-              previewImg.src = uploadedUrl;
-              saveLocalDraft();
-            } else {
-              alert("Image upload failed. Please try again.");
-            }
-          });
-        });
-      });
-    });
-  }
-
-  // Canvas Image Compression Helper
-  function compressImage(file, maxWidth, quality, callback) {
+  // Client-Side Image Compressor
+  function compressImage(file, maxWidth, maxHeight, quality, callback) {
     const reader = new FileReader();
     reader.readAsDataURL(file);
     reader.onload = (event) => {
       const img = new Image();
       img.src = event.target.result;
       img.onload = () => {
+        const canvas = document.createElement("canvas");
         let width = img.width;
         let height = img.height;
 
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
         }
 
-        const canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
-
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, width, height);
 
-        canvas.toBlob((blob) => callback(blob), "image/jpeg", quality);
+        // Export as lightweight compressed WebP data URL
+        const dataUrl = canvas.toDataURL("image/webp", quality);
+        callback(dataUrl);
       };
     };
   }
 
-  // Upload compressed Blob to ImgBB
-  function uploadToImgBB(imageBlob, callback) {
-    const formData = new FormData();
-    formData.append("image", imageBlob);
+  // Handle Logo Upload Event
+  if (storeLogoFileInput) {
+    storeLogoFileInput.addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (file) {
+        compressImage(file, 250, 250, 0.8, (compressedBase64) => {
+          currentLogoBase64 = compressedBase64;
+          if (logoPreviewImg) logoPreviewImg.src = compressedBase64;
+        });
+      }
+    });
+  }
 
-    fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-      method: "POST",
-      body: formData,
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          callback(data.data.url);
-        } else {
-          callback(null);
+  function showStatus(text, isError = false) {
+    statusMsg.innerText = text;
+    statusMsg.style.display = "block";
+    statusMsg.style.backgroundColor = isError ? "#fef2f2" : "#f0fdf4";
+    statusMsg.style.borderColor = isError ? "#fecaca" : "#bbf7d0";
+    statusMsg.style.color = isError ? "#991b1b" : "#166534";
+    setTimeout(() => { statusMsg.style.display = "none"; }, 4000);
+  }
+
+  // Fetch Store Settings & Products from Cloud
+  function fetchFromCloud() {
+    const storeId = storeIdInput.value.trim().toLowerCase();
+    if (!storeId) {
+      showStatus("Please enter a Store ID first.", true);
+      return;
+    }
+
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
+
+    fetch(firestoreUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error("Store not found or network error");
+        return res.json();
+      })
+      .then((doc) => {
+        if (!doc.fields) return;
+
+        storePhoneInput.value = doc.fields.phone?.stringValue || "";
+        storeSloganInput.value = doc.fields.slogan?.stringValue || "";
+        storeThemeColorInput.value = doc.fields.themeColor?.stringValue || "#10b981";
+        if (colorHexLabel) colorHexLabel.innerText = storeThemeColorInput.value;
+
+        currentLogoBase64 = doc.fields.logo?.stringValue || "";
+        if (logoPreviewImg) {
+          logoPreviewImg.src = currentLogoBase64 || "https://placehold.co/100x100?text=Logo";
         }
+
+        const rawItems = doc.fields.items?.arrayValue?.values || [];
+        localItems = rawItems.map((item) => {
+          const fields = item.mapValue?.fields || {};
+          return {
+            name: fields.name?.stringValue || "",
+            price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
+            img: fields.img?.stringValue || "",
+          };
+        });
+
+        renderProducts();
+        showStatus(`Loaded store settings and ${localItems.length} products.`);
       })
       .catch((err) => {
-        console.error("ImgBB Upload error:", err);
-        callback(null);
+        console.error(err);
+        showStatus("Store ID not found in cloud. Ready to create new store.", false);
       });
   }
 
-  // 5. Save Local Draft Helper
-  function saveLocalDraft() {
-    localStorage.setItem("draft_store_id", storeIdInput.value.trim().toLowerCase());
-    localStorage.setItem("draft_phone", phoneInput.value.trim());
-    localStorage.setItem("draft_inventory", JSON.stringify(inventory));
+  function renderProducts() {
+    productListContainer.innerHTML = "";
+    prodCount.innerText = localItems.length;
+
+    localItems.forEach((item, index) => {
+      const row = document.createElement("div");
+      row.className = "product-row";
+      row.innerHTML = `
+        <img src="${item.img || 'https://placehold.co/100x100?text=No+Img'}" onerror="this.src='https://placehold.co/100x100?text=No+Img';">
+        <div>
+          <strong style="font-size: 14px;">${item.name}</strong>
+        </div>
+        <div style="font-weight: 600; font-size: 14px;">KSh ${item.price.toLocaleString()}</div>
+        <button class="del-btn" data-index="${index}">🗑️</button>
+      `;
+      productListContainer.appendChild(row);
+    });
+
+    document.querySelectorAll(".del-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        localItems.splice(e.target.dataset.index, 1);
+        renderProducts();
+      });
+    });
   }
 
-  // 6. Add New Product Item
-  addItemBtn.addEventListener("click", () => {
-    inventory.push({ name: "", price: 0, img: "" });
-    saveLocalDraft();
-    renderInventory();
-  });
+  // Add Product to Local State
+  if (addProdBtn) {
+    addProdBtn.addEventListener("click", () => {
+      const name = prodNameInput.value.trim();
+      const price = Number(prodPriceInput.value);
+      const img = prodImgInput.value.trim();
 
-  // 7. Publish to Firestore Cloud
-  generateBtn.addEventListener("click", () => {
+      if (!name || isNaN(price)) {
+        showStatus("Please enter a valid product name and price.", true);
+        return;
+      }
+
+      localItems.push({ name, price, img });
+      renderProducts();
+
+      prodNameInput.value = "";
+      prodPriceInput.value = "";
+      prodImgInput.value = "";
+    });
+  }
+
+  // Sync Everything to Firestore
+  function saveToCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
-    const phone = phoneInput.value.trim();
+    const phone = storePhoneInput.value.trim();
+    const slogan = storeSloganInput.value.trim();
+    const themeColor = storeThemeColorInput.value;
 
-    if (!storeId) return alert("Please enter a Store ID!");
-    if (!phone) return alert("Please enter a WhatsApp Phone Number!");
+    if (!storeId) {
+      showStatus("Please enter a Store ID.", true);
+      return;
+    }
 
-    generateBtn.innerText = "⏳ Publishing to Cloud...";
-    generateBtn.disabled = true;
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
-    // Convert JavaScript array into Firestore REST Document schema
-    const firestoreItems = inventory.map((item) => ({
+    const formattedItems = localItems.map((item) => ({
       mapValue: {
         fields: {
-          name: { stringValue: item.name || "Product" },
-          price: { doubleValue: Number(item.price) || 0 },
+          name: { stringValue: item.name },
+          price: { doubleValue: item.price },
           img: { stringValue: item.img || "" },
         },
       },
@@ -315,48 +211,32 @@
     const payload = {
       fields: {
         phone: { stringValue: phone },
-        items: {
-          arrayValue: {
-            values: firestoreItems,
-          },
-        },
+        slogan: { stringValue: slogan },
+        logo: { stringValue: currentLogoBase64 },
+        themeColor: { stringValue: themeColor },
+        items: { arrayValue: { values: formattedItems } },
       },
     };
-
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}?updateMask.fieldPaths=phone&updateMask.fieldPaths=items`;
 
     fetch(firestoreUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     })
-      .then(async (res) => {
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error?.message || `HTTP Status ${res.status}`);
-        }
+      .then((res) => {
+        if (!res.ok) throw new Error("Failed to sync to Firestore");
         return res.json();
       })
       .then(() => {
-        generateBtn.innerText = "🚀 Publish Changes to Live Cloud";
-        generateBtn.disabled = false;
-
-        // Build live storefront URL
-        const currentOrigin = window.location.origin;
-        const currentPath = window.location.pathname.replace("dashboard.html", "index.html");
-        const liveUrl = `${currentOrigin}${currentPath}?id=${storeId}`;
-
-        storeUrlAnchor.href = liveUrl;
-        storeUrlAnchor.innerText = liveUrl;
-        linkBox.style.display = "block";
-
-        saveLocalDraft();
-        alert("🎉 Published successfully! All devices will now see this updated catalog.");
+        showStatus("🚀 Store settings, branding, and catalog published successfully!");
       })
       .catch((err) => {
-        generateBtn.innerText = "🚀 Publish Changes to Live Cloud";
-        generateBtn.disabled = false;
-        alert(`Failed to publish: ${err.message}`);
+        console.error(err);
+        showStatus("Failed to publish to cloud.", true);
       });
-  });
+  }
+
+  if (fetchCloudBtn) fetchCloudBtn.addEventListener("click", fetchFromCloud);
+  if (saveSettingsBtn) saveSettingsBtn.addEventListener("click", saveToCloud);
+  if (syncCloudBtn) syncCloudBtn.addEventListener("click", saveToCloud);
 })();
