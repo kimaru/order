@@ -1,186 +1,337 @@
-const IMGBB_API_KEY = "9c3b9b39a59927a3a799b8c8b49bad6c";
+(function () {
+  const PROJECT_ID = "whatsapp-eco-engine-80882";
+  const IMGBB_API_KEY = "6d0b64d39c0618037f48c0840b3cb1c9"; // Replace with your ImgBB key if different
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAhfgJlElspGrKXbBKLqnwrUfSYSihWbhI",
-  authDomain: "whatsapp-eco-engine-80882.firebaseapp.com",
-  projectId: "whatsapp-eco-engine-80882",
-  storageBucket: "whatsapp-eco-engine-80882.firebasestorage.app",
-  messagingSenderId: "394797472809",
-  appId: "1:394797472809:web:b3257dcea988515498d038"
-};
+  let inventory = [];
 
-let inventory = [];
+  // DOM Elements
+  const storeIdInput = document.getElementById("store-id");
+  const phoneInput = document.getElementById("phone");
+  const inventoryContainer = document.getElementById("inventory-container");
+  const addItemBtn = document.getElementById("add-item-btn");
+  const generateBtn = document.getElementById("generate-btn");
+  const saveBtn = document.getElementById("save-btn");
+  const linkBox = document.getElementById("link-box");
+  const storeUrlAnchor = document.getElementById("store-url");
 
-const savedPhone = localStorage.getItem('merchantPhone') || '';
-const savedStoreId = localStorage.getItem('customStoreId') || '';
-const savedInventory = localStorage.getItem('merchantInventory') ? JSON.parse(localStorage.getItem('merchantInventory')) : [];
+  // 1. Initial Load from Local Draft (if returning on same device)
+  const savedStoreId = localStorage.getItem("draft_store_id") || "";
+  const savedPhone = localStorage.getItem("draft_phone") || "";
+  const savedInventory = localStorage.getItem("draft_inventory");
 
-if (savedPhone) document.getElementById('phone').value = savedPhone;
-if (savedStoreId) document.getElementById('store-id').value = savedStoreId;
+  if (savedStoreId) storeIdInput.value = savedStoreId;
+  if (savedPhone) phoneInput.value = savedPhone;
 
-if (savedInventory && savedInventory.length > 0) {
-  inventory = savedInventory;
-  inventory.forEach(item => addRowToTable(item));
-} else {
-  addRowToTable(); 
-}
+  if (savedInventory) {
+    try {
+      inventory = JSON.parse(savedInventory);
+    } catch (e) {      inventory = [];
+    }
+  }
 
-document.getElementById('add-item-btn').addEventListener('click', () => addRowToTable());
+  // If we have an initial store ID, try fetching live cloud data right away
+  if (savedStoreId) {
+    fetchStoreFromCloud(savedStoreId);
+  } else {
+    renderInventory();
+  }
 
-function addRowToTable(item = { img: '', name: '', price: '' }) {
-  const container = document.getElementById('inventory-container');
-  const div = document.createElement('div');
-  div.className = 'product-row-item';
-  
-  div.innerHTML = `
-    <div class="item-media-box">
-      <img class="row-preview-img" src="">
-      <input type="hidden" class="p-img-url" value="${item.img || ''}">
-      <div class="upload-btn-wrapper">
-        <button class="btn" style="background:#eee; color:#333; font-size:12px; padding:8px 12px;">📁 Photo</button>
-        <input type="file" class="p-file-input" accept="image/*">
-        <span class="upload-status" style="display:block; margin-top:2px;">${item.img ? '✅ Ready' : 'No Photo'}</span>
-      </div>
-    </div>
-    <div class="form-group-item" style="flex:2;"><input type="text" class="p-name" placeholder="Product Name & Size" value="${item.name || ''}" style="margin-bottom:8px;"></div>
-    <div class="form-group-item"><input type="number" class="p-price" placeholder="Price" value="${item.price || ''}"></div>
-    <div><button class="btn btn-danger delete-row-btn">Delete</button></div>
-  `;
-  
-  const fileInput = div.querySelector('.p-file-input');
-  const previewImg = div.querySelector('.row-preview-img');
-  const hiddenUrlInput = div.querySelector('.p-img-url');
-  const statusText = div.querySelector('.upload-status');
-  
-  const defaultPlaceholder = 'https://placehold.co/60x60?text=No+Img';
-  previewImg.src = item.img ? item.img : defaultPlaceholder;
-  
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    
-    statusText.innerText = "⚡ Crushing Size...";
+  // 2. Cloud Sync: Automatically fetch from Firebase when Store ID changes
+  let debounceTimer;
+  storeIdInput.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    const id = storeIdInput.value.trim().toLowerCase();
+    if (!id) return;
 
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = function (event) {
-      const imgElement = new Image();
-      imgElement.src = event.target.result;
-      imgElement.onload = function () {
-        const canvas = document.createElement('canvas');
-        let width = imgElement.width;
-        let height = imgElement.height;
-        
-        const MAX_SIZE = 800;
-        if (width > height) {
-          if (width > MAX_SIZE) { height *= MAX_SIZE / width; width = MAX_SIZE; }
-        } else {
-          if (height > MAX_SIZE) { width *= MAX_SIZE / height; height = MAX_SIZE; }
+    // Debounce to avoid spamming reads while typing
+    debounceTimer = setTimeout(() => {
+      fetchStoreFromCloud(id);
+    }, 600);
+  });
+
+  // Fetch store data from Firestore REST API
+  function fetchStoreFromCloud(storeId) {
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
+
+    fetch(firestoreUrl)
+      .then((res) => {
+        if (!res.ok) {
+          if (res.status === 404) {
+            console.log("New store ID detected — starting with fresh inventory.");
+          }
+          return null;
         }
-        
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(imgElement, 0, 0, width, height);
-        
-        canvas.toBlob((blob) => {
-          statusText.innerText = "⏳ Uploading...";
-          const formData = new FormData();
-          formData.append("image", blob, "optimized.jpg");
+        return res.json();
+      })
+      .then((doc) => {
+        if (!doc || !doc.fields) return;
 
-          fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
-            method: "POST",
-            body: formData
-          })
-          .then(response => response.json())
-          .then(result => {
-            if (result.success) {
-              hiddenUrlInput.value = result.data.url;
-              previewImg.src = result.data.url;
-              statusText.innerText = "✅ Done!";
-            } else { statusText.innerText = "❌ Failed"; }
-          }).catch(() => statusText.innerText = "❌ Error");
-        }, "image/jpeg", 0.7);
-      };
-    };
-  });
-  
-  div.querySelector('.delete-row-btn').addEventListener('click', () => div.remove());
-  container.appendChild(div);
-}
+        // Pull Cloud Phone Number
+        if (doc.fields.phone && doc.fields.phone.stringValue) {
+          phoneInput.value = doc.fields.phone.stringValue;
+        }
 
-function saveData(callback) {
-  const phone = document.getElementById('phone').value;
-  const storeId = document.getElementById('store-id').value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-  const items = [];
-  
-  const rows = document.querySelectorAll('.product-row-item');
-  rows.forEach(row => {
-    const img = row.querySelector('.p-img-url').value;
-    const name = row.querySelector('.p-name').value;
-    const price = row.querySelector('.p-price').value;
-    if (name && price) items.push({ img, name, price: Number(price) });
-  });
+        // Pull Cloud Inventory Items
+        const rawItems = doc.fields.items?.arrayValue?.values || [];
+        inventory = rawItems.map((item) => {
+          const mapFields = item.mapValue?.fields || {};
+          return {
+            name: mapFields.name?.stringValue || "",
+            price: Number(mapFields.price?.doubleValue || mapFields.price?.integerValue || 0),
+            img: mapFields.img?.stringValue || "",
+          };
+        });
 
-  localStorage.setItem('merchantPhone', phone);
-  localStorage.setItem('customStoreId', storeId);
-  localStorage.setItem('merchantInventory', JSON.stringify(items));
-  
-  inventory = items;
-  if (callback) callback(phone, storeId);
-}
+        // Save fresh draft & update UI
+        saveLocalDraft();
+        renderInventory();
+      })
+      .catch((err) => console.error("Cloud sync error:", err));
+  }
 
-document.getElementById('save-btn').addEventListener('click', () => {
-  saveData(() => alert("Saved to local device memory blueprint!"));
-});
+  // 3. Render Product Cards in Dashboard
+  function renderInventory() {
+    inventoryContainer.innerHTML = "";
 
-document.getElementById('generate-btn').addEventListener('click', () => {
-  saveData((phone, storeId) => {
-    if (!phone || !storeId || inventory.length === 0) {
-      alert("Please check that phone, store ID, and items are completely filled.");
+    if (inventory.length === 0) {
+      inventoryContainer.innerHTML = `
+        <div style="text-align: center; padding: 30px; color: #94a3b8; font-size: 14px;">
+          No items added yet. Click <strong>+ Add New Item</strong> to build your catalog.
+        </div>`;
       return;
     }
 
-    // ⚡ SWITCH TO CLEAN UNCONDITIONAL OVERWRITE ARCHITECTURE (Removes trailing update mask strings)
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/stores/${storeId}`;
-    
+    inventory.forEach((item, index) => {
+      const card = document.createElement("div");
+      card.className = "product-row-item";
+
+      const imgSrc = item.img || "https://placehold.co/100x100?text=No+Image";
+
+      card.innerHTML = `
+        <div class="item-media-box">
+          <img src="${imgSrc}" class="row-preview-img" id="img-preview-${index}" onerror="this.src='https://placehold.co/100x100?text=No+Image';">
+          <div class="upload-btn-wrapper">
+            <button class="btn">📸 Photo</button>
+            <input type="file" accept="image/*" class="image-uploader" data-index="${index}">
+          </div>
+        </div>
+
+        <div class="form-group-item" style="flex: 2;">
+          <label>Product Name</label>
+          <input type="text" class="item-name" data-index="${index}" value="${item.name}" placeholder="e.g. Vanilla Perfume 50ml">
+        </div>
+
+        <div class="form-group-item" style="flex: 1;">
+          <label>Price</label>
+          <input type="number" class="item-price" data-index="${index}" value="${item.price || ''}" placeholder="0.00">
+        </div>
+
+        <button class="btn btn-danger remove-btn" data-index="${index}">🗑️</button>
+      `;
+
+      inventoryContainer.appendChild(card);
+    });
+
+    attachEventListeners();
+  }
+
+  // 4. Input Change Listeners & Image Compression/Upload
+  function attachEventListeners() {
+    // Name input change
+    document.querySelectorAll(".item-name").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const idx = e.target.dataset.index;
+        inventory[idx].name = e.target.value;
+        saveLocalDraft();
+      });
+    });
+
+    // Price input change
+    document.querySelectorAll(".item-price").forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const idx = e.target.dataset.index;
+        inventory[idx].price = Number(e.target.value);
+        saveLocalDraft();
+      });
+    });
+
+    // Remove item
+    document.querySelectorAll(".remove-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const idx = e.target.dataset.index;
+        inventory.splice(idx, 1);
+        saveLocalDraft();
+        renderInventory();
+      });
+    });
+
+    // Image Upload & Canvas Compression
+    document.querySelectorAll(".image-uploader").forEach((fileInput) => {
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        const idx = e.target.dataset.index;
+        if (!file) return;
+
+        const previewImg = document.getElementById(`img-preview-${idx}`);
+        previewImg.style.opacity = "0.4";
+
+        // Compress image using Canvas before uploading
+        compressImage(file, 800, 0.7, (compressedBlob) => {
+          uploadToImgBB(compressedBlob, (uploadedUrl) => {
+            previewImg.style.opacity = "1";
+            if (uploadedUrl) {
+              inventory[idx].img = uploadedUrl;
+              previewImg.src = uploadedUrl;
+              saveLocalDraft();
+            } else {
+              alert("Image upload failed. Please try again.");
+            }
+          });
+        });
+      });
+    });
+  }
+
+  // Canvas Image Compression Helper
+  function compressImage(file, maxWidth, quality, callback) {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => callback(blob), "image/jpeg", quality);
+      };
+    };
+  }
+
+  // Upload compressed Blob to ImgBB
+  function uploadToImgBB(imageBlob, callback) {
+    const formData = new FormData();
+    formData.append("image", imageBlob);
+
+    fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+      method: "POST",
+      body: formData,
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) {
+          callback(data.data.url);
+        } else {
+          callback(null);
+        }
+      })
+      .catch((err) => {
+        console.error("ImgBB Upload error:", err);
+        callback(null);
+      });
+  }
+
+  // 5. Local Draft Helper
+  function saveLocalDraft() {
+    localStorage.setItem("draft_store_id", storeIdInput.value.trim().toLowerCase());
+    localStorage.setItem("draft_phone", phoneInput.value.trim());
+    localStorage.setItem("draft_inventory", JSON.stringify(inventory));
+  }
+
+  // 6. Manual Save Draft Button
+  if (saveBtn) {
+    saveBtn.addEventListener("click", () => {
+      saveLocalDraft();
+      alert("Draft saved locally on this browser!");
+    });
+  }
+
+  // 7. Add New Product Item
+  addItemBtn.addEventListener("click", () => {
+    inventory.push({ name: "", price: 0, img: "" });
+    saveLocalDraft();
+    renderInventory();
+  });
+
+  // 8. Publish to Firestore Cloud
+  generateBtn.addEventListener("click", () => {
+    const storeId = storeIdInput.value.trim().toLowerCase();
+    const phone = phoneInput.value.trim();
+
+    if (!storeId) return alert("Please enter a Store ID!");
+    if (!phone) return alert("Please enter a WhatsApp Phone Number!");
+
+    generateBtn.innerText = "⏳ Publishing to Cloud...";
+    generateBtn.disabled = true;
+
+    // Convert JavaScript array into Firestore REST Document schema
+    const firestoreItems = inventory.map((item) => ({
+      mapValue: {
+        fields: {
+          name: { stringValue: item.name || "Product" },
+          price: { doubleValue: Number(item.price) || 0 },
+          img: { stringValue: item.img || "" },
+        },
+      },
+    }));
+
     const payload = {
       fields: {
         phone: { stringValue: phone },
         items: {
           arrayValue: {
-            values: inventory.map(item => ({
-              mapValue: {
-                fields: {
-                  name: { stringValue: item.name },
-                  price: { doubleValue: item.price },
-                  img: { stringValue: item.img }
-                }
-              }
-            }))
-          }
-        }
-      }
+            values: firestoreItems,
+          },
+        },
+      },
     };
 
-    // ⚡ Using PATCH without query params forces clean, structural initialization if the doc doesn't exist yet!
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}?updateMask.fieldPaths=phone&updateMask.fieldPaths=items`;
+
     fetch(firestoreUrl, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     })
-    .then(res => res.json())
-    .then(data => {
-      if (data.name) {
-        const finalFormUrl = `https://kimaru.github.io/order/?id=${storeId}`;
-        document.getElementById('store-url').href = finalFormUrl;
-        document.getElementById('store-url').innerText = finalFormUrl;
-        document.getElementById('link-box').style.display = 'block';
-        alert("🚀 Inventory published directly from mobile to the cloud database successfully!");
-      } else { 
-        console.error("Firebase Response:", data);
-        alert("Cloud submission refused. Ensure your rules tab allows database transactions."); 
-      }
-    }).catch(err => alert("Error: " + err.message));
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.error?.message || `HTTP Status ${res.status}`);
+        }
+        return res.json();
+      })
+      .then(() => {
+        generateBtn.innerText = "🚀 Publish Changes to Live Cloud";
+        generateBtn.disabled = false;
+
+        // Build live storefront URL
+        const currentOrigin = window.location.origin;
+        const currentPath = window.location.pathname.replace("dashboard.html", "index.html");
+        const liveUrl = `${currentOrigin}${currentPath}?id=${storeId}`;
+
+        storeUrlAnchor.href = liveUrl;
+        storeUrlAnchor.innerText = liveUrl;
+        linkBox.style.display = "block";
+
+        saveLocalDraft();
+        alert("🎉 Published successfully! All devices will now see this updated catalog.");
+      })
+      .catch((err) => {
+        generateBtn.innerText = "🚀 Publish Changes to Live Cloud";
+        generateBtn.disabled = false;
+        alert(`Failed to publish: ${err.message}`);
+      });
   });
-});
+})();
