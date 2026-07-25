@@ -1,288 +1,255 @@
 (function () {
   const PROJECT_ID = "whatsapp-eco-engine-80882";
 
-  // State Management
+  // Extract Store ID from URL parameter (e.g. index.html?store=aromatic-vibes)
+  const urlParams = new URLSearchParams(window.location.search);
+  const storeId = urlParams.get("store") || "aromatic-vibes";
+
+  // State
   let storePhone = "";
-  let storeItems = [];
-  let cart = []; // Array of { name, price, quantity, img }
+  let cart = JSON.parse(localStorage.getItem(`cart_${storeId}`)) || [];
 
   // DOM Elements
-  const storeTitle = document.getElementById("store-title");
-  const catalogGrid = document.getElementById("catalog-grid");
-  const floatingCart = document.getElementById("floating-cart");
-  const cartCount = document.getElementById("cart-count");
-  const cartBarTotal = document.getElementById("cart-bar-total");
+  const brandLogo = document.getElementById("brand-logo");
+  const brandName = document.getElementById("brand-name");
+  const brandSlogan = document.getElementById("brand-slogan");
+  const productGrid = document.getElementById("product-grid");
+
+  const cartBadge = document.getElementById("cart-badge");
+  const cartTotal = document.getElementById("cart-total");
+  const openCartBtn = document.getElementById("open-cart-btn");
+  const closeCartBtn = document.getElementById("close-cart-btn");
   const cartOverlay = document.getElementById("cart-overlay");
   const cartDrawer = document.getElementById("cart-drawer");
-  const closeCartBtn = document.getElementById("close-cart-btn");
   const cartItemsContainer = document.getElementById("cart-items-container");
-  const cartTotalPrice = document.getElementById("cart-total-price");
   const whatsappCheckoutBtn = document.getElementById("whatsapp-checkout-btn");
 
-  // Customer Form Elements
   const custNameInput = document.getElementById("cust-name");
   const custAddressInput = document.getElementById("cust-address");
   const custNotesInput = document.getElementById("cust-notes");
 
-  // 1. Get Store ID from URL parameter (e.g., index.html?id=mystore)
-  const urlParams = new URLSearchParams(window.location.search);
-  const storeId = (urlParams.get("id") || "demo").toLowerCase();
-
-  // Update Store Title
-  if (storeTitle) {
-    storeTitle.innerText = storeId.replace(/-/g, " ");
-  }
-
-  // 2. Fetch Storefront Data from Firestore
-  function fetchStorefront() {
+  // Fetch Store Settings & Catalog from Firestore
+  function fetchStoreData() {
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) {
-          throw new Error(`Store "${storeId}" not found (HTTP ${res.status})`);
-        }
+        if (!res.ok) throw new Error("Store not found");
         return res.json();
       })
       .then((doc) => {
         if (!doc.fields) return;
 
-        // Parse Store Phone
+        // Phone Number
         storePhone = doc.fields.phone?.stringValue || "";
 
-        // Parse Store Items
+        // Dynamic Branding & Colors
+        const slogan = doc.fields.slogan?.stringValue || "";
+        const logoUrl = doc.fields.logo?.stringValue || "";
+        const themeColor = doc.fields.themeColor?.stringValue || "#10b981";
+
+        // Apply Custom Accent Color Variable
+        document.documentElement.style.setProperty("--accent-color", themeColor);
+
+        // Header Updates
+        brandName.innerText = storeId.replace(/-/g, " ");
+        if (slogan) {
+          brandSlogan.innerText = slogan;
+          brandSlogan.style.display = "block";
+        } else {
+          brandSlogan.style.display = "none";
+        }
+
+        if (logoUrl) {
+          brandLogo.src = logoUrl;
+          brandLogo.style.display = "block";
+        } else {
+          brandLogo.style.display = "none";
+        }
+
+        // Render Catalog Items
         const rawItems = doc.fields.items?.arrayValue?.values || [];
-        storeItems = rawItems.map((item) => {
-          const mapFields = item.mapValue?.fields || {};
+        const items = rawItems.map((item) => {
+          const fields = item.mapValue?.fields || {};
           return {
-            name: mapFields.name?.stringValue || "Untitled Product",
-            price: Number(mapFields.price?.doubleValue || mapFields.price?.integerValue || 0),
-            img: mapFields.img?.stringValue || "https://placehold.co/300x300?text=No+Image",
+            name: fields.name?.stringValue || "Unnamed Product",
+            price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
+            img: fields.img?.stringValue || "https://placehold.co/300x300?text=No+Photo",
           };
         });
 
-        renderCatalog();
+        renderProducts(items);
       })
       .catch((err) => {
-        console.error("Error loading storefront:", err);
-        if (catalogGrid) {
-          catalogGrid.innerHTML = `
-            <div style="grid-column: 1 / -1; text-align: center; padding: 40px 16px; color: #64748b;">
-              <p style="font-size: 16px; font-weight: 600; margin-bottom: 8px;">Store Not Found</p>
-              <p style="font-size: 13px;">Please check the store link or create this store ID in your dashboard.</p>
-            </div>`;
-        }
+        console.error(err);
+        brandName.innerText = "Store Not Found";
+        productGrid.innerHTML = `<p style="text-align: center; color: #94a3b8; grid-column: 1/-1;">Could not load products for "${storeId}". Please check the URL parameter.</p>`;
       });
   }
 
-  // 3. Render Product Catalog Grid
-  function renderCatalog() {
-    if (!catalogGrid) return;
+  // Render Catalog Grid
+  function renderProducts(items) {
+    productGrid.innerHTML = "";
 
-    if (storeItems.length === 0) {
-      catalogGrid.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 40px 16px; color: #64748b;">
-          No products currently available in this store.
-        </div>`;
+    if (items.length === 0) {
+      productGrid.innerHTML = `<p style="text-align: center; color: #94a3b8; grid-column: 1/-1;">No products available right now.</p>`;
       return;
     }
 
-    catalogGrid.innerHTML = "";
-
-    storeItems.forEach((item, index) => {
+    items.forEach((item) => {
       const card = document.createElement("div");
       card.className = "product-card";
-
-      const formattedPrice = item.price.toLocaleString();
-      const imgSrc = item.img || "https://placehold.co/300x300?text=No+Image";
-
       card.innerHTML = `
-        <img src="${imgSrc}" class="product-img" alt="${item.name}" onerror="this.src='https://placehold.co/300x300?text=No+Image';">
+        <img src="${item.img}" class="product-img" alt="${item.name}" onerror="this.src='https://placehold.co/300x300?text=No+Photo';">
         <div class="product-details">
           <div>
             <div class="product-title">${item.name}</div>
-            <div class="product-price">KSh ${formattedPrice}</div>
+            <div class="product-price">KSh ${item.price.toLocaleString()}</div>
           </div>
-          <button class="add-to-cart-btn" data-index="${index}">+ Add to Cart</button>
+          <button class="add-to-cart-btn" data-name="${item.name}" data-price="${item.price}">+ Add to Cart</button>
         </div>
       `;
-
-      catalogGrid.appendChild(card);
+      productGrid.appendChild(card);
     });
 
-    // Add click listeners to "Add to Cart" buttons
+    // Add to Cart Listeners
     document.querySelectorAll(".add-to-cart-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        const idx = e.target.dataset.index;
-        addToCart(storeItems[idx]);
+        const name = e.target.getAttribute("data-name");
+        const price = Number(e.target.getAttribute("data-price"));
+        addToCart(name, price);
       });
     });
   }
 
-  // 4. Cart Logic
-  function addToCart(product) {
-    const existingIndex = cart.findIndex((item) => item.name === product.name);
-
-    if (existingIndex > -1) {
-      cart[existingIndex].quantity += 1;
+  // Cart Management
+  function addToCart(name, price) {
+    const existing = cart.find((item) => item.name === name);
+    if (existing) {
+      existing.qty += 1;
     } else {
-      cart.push({
-        name: product.name,
-        price: product.price,
-        quantity: 1,
-        img: product.img,
-      });
+      cart.push({ name, price, qty: 1 });
     }
-
-    updateCartUI();
+    saveCart();
   }
 
-  function changeQuantity(index, delta) {
-    cart[index].quantity += delta;
-    if (cart[index].quantity <= 0) {
+  function updateQty(index, change) {
+    cart[index].qty += change;
+    if (cart[index].qty <= 0) {
       cart.splice(index, 1);
     }
+    saveCart();
+  }
+
+  function saveCart() {
+    localStorage.setItem(`cart_${storeId}`, JSON.stringify(cart));
     updateCartUI();
   }
 
-  // 5. Update UI (Floating Bar & Drawer Content)
+  function calculateTotal() {
+    return cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  }
+
+  function calculateItemCount() {
+    return cart.reduce((sum, item) => sum + item.qty, 0);
+  }
+
   function updateCartUI() {
-    const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
-    const totalPrice = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    const count = calculateItemCount();
+    const total = calculateTotal();
 
-    // Floating Bar Visibility & Count
-    if (totalItems > 0) {
-      floatingCart.style.display = "flex";
-      cartCount.innerText = totalItems;
-      cartBarTotal.innerText = `KSh ${totalPrice.toLocaleString()}`;
-    } else {
-      floatingCart.style.display = "none";
-      closeCartDrawer();
-    }
+    cartBadge.innerText = count;
+    cartTotal.innerText = `KSh ${total.toLocaleString()}`;
 
-    // Render Items inside Cart Drawer
+    // Render Drawer Items
+    cartItemsContainer.innerHTML = "";
+
     if (cart.length === 0) {
-      cartItemsContainer.innerHTML = `<p class="empty-msg">Your cart is currently empty.</p>`;
-      cartTotalPrice.innerText = "KSh 0.00";
+      cartItemsContainer.innerHTML = `<p style="text-align: center; color: #94a3b8; padding: 20px 0;">Your cart is empty.</p>`;
       return;
     }
 
-    cartItemsContainer.innerHTML = "";
     cart.forEach((item, index) => {
       const row = document.createElement("div");
       row.className = "cart-item-row";
-
-      const itemTotal = (item.price * item.quantity).toLocaleString();
-
       row.innerHTML = `
-        <div class="cart-item-info">
-          <div class="cart-item-title">${item.name}</div>
-          <div class="cart-item-sub">KSh ${item.price.toLocaleString()} × ${item.quantity} = <strong>KSh ${itemTotal}</strong></div>
+        <div>
+          <strong style="font-size: 14px;">${item.name}</strong>
+          <div style="font-size: 12px; color: #64748b;">KSh ${item.price.toLocaleString()} × ${item.qty}</div>
         </div>
-        <div class="cart-item-controls">
-          <button class="qty-btn minus-btn" data-index="${index}">-</button>
-          <span style="font-size: 13px; font-weight: 600;">${item.quantity}</span>
-          <button class="qty-btn plus-btn" data-index="${index}">+</button>
+        <div class="qty-controls">
+          <button class="qty-btn" data-index="${index}" data-change="-1">-</button>
+          <span style="font-size: 13px; font-weight: 600;">${item.qty}</span>
+          <button class="qty-btn" data-index="${index}" data-change="1">+</button>
         </div>
       `;
-
       cartItemsContainer.appendChild(row);
     });
 
-    cartTotalPrice.innerText = `KSh ${totalPrice.toLocaleString()}`;
-
-    // Attach quantity button handlers
-    document.querySelectorAll(".minus-btn").forEach((btn) => {
+    document.querySelectorAll(".qty-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        changeQuantity(e.target.dataset.index, -1);
-      });
-    });
-
-    document.querySelectorAll(".plus-btn").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        changeQuantity(e.target.dataset.index, 1);
+        const idx = Number(e.target.getAttribute("data-index"));
+        const change = Number(e.target.getAttribute("data-change"));
+        updateQty(idx, change);
       });
     });
   }
 
-  // 6. Cart Drawer Toggle Controls
-  function openCartDrawer() {
-    cartOverlay.classList.add("active");
-    cartDrawer.classList.add("active");
+  // Drawer Toggle Handlers
+  function openCart() {
+    cartDrawer.classList.add("open");
+    cartOverlay.style.display = "block";
   }
 
-  function closeCartDrawer() {
-    cartOverlay.classList.remove("active");
-    cartDrawer.classList.remove("active");
+  function closeCart() {
+    cartDrawer.classList.remove("open");
+    cartOverlay.style.display = "none";
   }
 
-  if (floatingCart) floatingCart.addEventListener("click", openCartDrawer);
-  if (closeCartBtn) closeCartBtn.addEventListener("click", closeCartDrawer);
-  if (cartOverlay) cartOverlay.addEventListener("click", closeCartDrawer);
+  openCartBtn.addEventListener("click", openCart);
+  closeCartBtn.addEventListener("click", closeCart);
+  cartOverlay.addEventListener("click", closeCart);
 
-  // 7. Complete Order on WhatsApp Handler
-  if (whatsappCheckoutBtn) {
-    whatsappCheckoutBtn.addEventListener("click", () => {
-      if (cart.length === 0) {
-        alert("Your cart is empty!");
-        return;
-      }
+  // WhatsApp Checkout Handler
+  whatsappCheckoutBtn.addEventListener("click", () => {
+    if (cart.length === 0) {
+      alert("Your cart is empty.");
+      return;
+    }
 
-      if (!storePhone) {
-        alert("This store has not configured a WhatsApp phone number yet.");
-        return;
-      }
+    const name = custNameInput.value.trim();
+    const address = custAddressInput.value.trim();
+    const notes = custNotesInput.value.trim();
 
-      // Read Customer Delivery Details
-      const custName = custNameInput ? custNameInput.value.trim() : "";
-      const custAddress = custAddressInput ? custAddressInput.value.trim() : "";
-      const custNotes = custNotesInput ? custNotesInput.value.trim() : "";
+    if (!name || !address) {
+      alert("Please fill in your Name and Delivery Address.");
+      return;
+    }
 
-      // Validate Required Fields
-      if (!custName) {
-        alert("Please enter your name for the order.");
-        if (custNameInput) custNameInput.focus();
-        return;
-      }
+    if (!storePhone) {
+      alert("This merchant has not set up a WhatsApp phone number yet.");
+      return;
+    }
 
-      if (!custAddress) {
-        alert("Please enter your delivery address or location.");
-        if (custAddressInput) custAddressInput.focus();
-        return;
-      }
+    let message = `🛒 *NEW ORDER - ${storeId.toUpperCase()}*\n\n`;
+    message += `👤 *Customer:* ${name}\n`;
+    message += `📍 *Delivery Address:* ${address}\n`;
+    if (notes) message += `📝 *Notes:* ${notes}\n`;
+    message += `\n*Order Items:*\n`;
 
-      const totalAmount = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-
-      // Build Formatted WhatsApp Message
-      let message = `🛍️ *NEW ORDER PLACED*\n`;
-      message += `----------------------------------\n`;
-      message += `👤 *Customer:* ${custName}\n`;
-      message += `📍 *Delivery Address:* ${custAddress}\n`;
-      if (custNotes) {
-        message += `📝 *Notes:* ${custNotes}\n`;
-      }
-      message += `----------------------------------\n\n`;
-      message += `🛒 *ORDER ITEMS:*\n`;
-
-      cart.forEach((item, index) => {
-        const itemTotal = item.price * item.quantity;
-        message += `${index + 1}. *${item.name}* x${item.quantity} — KSh ${itemTotal.toLocaleString()}\n`;
-      });
-
-      message += `\n💰 *TOTAL AMOUNT:* KSh ${totalAmount.toLocaleString()}\n`;
-      message += `----------------------------------\n`;
-      message += `Please confirm my order and share payment instructions!`;
-
-      // Clean phone number (keep digits only)
-      const cleanPhone = storePhone.replace(/[^0-9]/g, "");
-      const encodedMessage = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
-
-      // Redirect to WhatsApp
-      window.open(whatsappUrl, "_blank");
+    cart.forEach((item, i) => {
+      message += `${i + 1}. ${item.name} (x${item.qty}) - KSh ${(item.price * item.qty).toLocaleString()}\n`;
     });
-  }
 
-  // Initialize Storefront
-  fetchStorefront();
+    message += `\n💰 *Total:* KSh ${calculateTotal().toLocaleString()}`;
+
+    const cleanedPhone = storePhone.replace(/[^0-9]/g, "");
+    const whatsappUrl = `https://wa.me/${cleanedPhone}?text=${encodeURIComponent(message)}`;
+
+    window.open(whatsappUrl, "_blank");
+  });
+
+  // Initialize Page
+  fetchStoreData();
+  updateCartUI();
 })();
