@@ -29,11 +29,11 @@
     .btn-secondary { background: #0f172a; }
     .btn-outline { background: transparent; border: 1px solid #cbd5e1; color: #334155; }
 
-    .logo-upload-box {
+    .image-upload-box {
       display: flex; align-items: center; gap: 16px; padding: 12px; border: 1px dashed #cbd5e1; border-radius: 8px; background: #f8fafc;
     }
-    .logo-preview {
-      width: 60px; height: 60px; border-radius: 50%; object-fit: cover; background: #e2e8f0; border: 1px solid #cbd5e1; flex-shrink: 0;
+    .preview-thumb {
+      width: 60px; height: 60px; border-radius: 8px; object-fit: cover; background: #e2e8f0; border: 1px solid #cbd5e1; flex-shrink: 0;
     }
 
     .product-row { display: grid; grid-template-columns: 60px 1fr 100px 40px; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid #f1f5f9; }
@@ -79,11 +79,11 @@
     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 16px;">
       <div class="form-group">
         <label>Store Logo Image</label>
-        <div class="logo-upload-box">
-          <img id="logo-preview-img" src="https://placehold.co/100x100?text=Logo" class="logo-preview" alt="Store Logo Preview">
+        <div class="image-upload-box">
+          <img id="logo-preview-img" src="https://placehold.co/100x100?text=Logo" class="preview-thumb" style="border-radius: 50%;" alt="Store Logo Preview">
           <div>
             <input type="file" id="store-logo-file" accept="image/*" style="font-size: 12px; margin-bottom: 4px;">
-            <p style="font-size: 11px; color: #64748b;">Auto-compressed for fast loading.</p>
+            <p style="font-size: 11px; color: #64748b;">Auto-compressed logo image.</p>
           </div>
         </div>
       </div>
@@ -113,10 +113,19 @@
         <input type="number" id="prod-price" placeholder="e.g. 3500">
       </div>
     </div>
+
+    <!-- Direct File Upload for Product Image -->
     <div class="form-group">
-      <label for="prod-img">Product Image URL</label>
-      <input type="text" id="prod-img" placeholder="https://...">
+      <label>Product Photo</label>
+      <div class="image-upload-box">
+        <img id="prod-preview-img" src="https://placehold.co/100x100?text=Product" class="preview-thumb" alt="Product Photo Preview">
+        <div>
+          <input type="file" id="prod-img-file" accept="image/*" style="font-size: 12px; margin-bottom: 4px;">
+          <p style="font-size: 11px; color: #64748b;">Select image file from camera or device gallery.</p>
+        </div>
+      </div>
     </div>
+
     <button id="add-prod-btn" class="btn">+ Add Product to List</button>
   </div>
 
