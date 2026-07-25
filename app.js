@@ -1,9 +1,9 @@
 (function () {
   const PROJECT_ID = "whatsapp-eco-engine-80882";
 
-  // Extract Store ID from URL parameter (e.g. index.html?store=aromatic-vibes)
+  // Extract Store ID from URL (default to aromatic-vibes)
   const urlParams = new URLSearchParams(window.location.search);
-  const storeId = urlParams.get("store") || "aromatic-vibes";
+  const storeId = (urlParams.get("store") || "aromatic-vibes").toLowerCase().trim();
 
   // State
   let storePhone = "";
@@ -28,31 +28,32 @@
   const custAddressInput = document.getElementById("cust-address");
   const custNotesInput = document.getElementById("cust-notes");
 
-  // Fetch Store Settings & Catalog from Firestore
+  // Fetch Store Data
   function fetchStoreData() {
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) throw new Error("Store not found");
+        if (!res.ok) throw new Error("Store record not found in Firestore.");
         return res.json();
       })
       .then((doc) => {
-        if (!doc.fields) return;
+        const fields = doc.fields || {};
 
-        // Phone Number
-        storePhone = doc.fields.phone?.stringValue || "";
+        // Parse Phone Number
+        storePhone = fields.phone?.stringValue || "";
 
-        // Dynamic Branding & Colors
-        const slogan = doc.fields.slogan?.stringValue || "";
-        const logoUrl = doc.fields.logo?.stringValue || "";
-        const themeColor = doc.fields.themeColor?.stringValue || "#10b981";
+        // Parse Branding
+        const slogan = fields.slogan?.stringValue || "";
+        const logoUrl = fields.logo?.stringValue || "";
+        const themeColor = fields.themeColor?.stringValue || "#10b981";
 
-        // Apply Custom Accent Color Variable
+        // Set Accent Color Variable
         document.documentElement.style.setProperty("--accent-color", themeColor);
 
-        // Header Updates
+        // Header Text
         brandName.innerText = storeId.replace(/-/g, " ");
+        
         if (slogan) {
           brandSlogan.innerText = slogan;
           brandSlogan.style.display = "block";
@@ -67,14 +68,14 @@
           brandLogo.style.display = "none";
         }
 
-        // Render Catalog Items
-        const rawItems = doc.fields.items?.arrayValue?.values || [];
+        // Parse Catalog
+        const rawItems = fields.items?.arrayValue?.values || [];
         const items = rawItems.map((item) => {
-          const fields = item.mapValue?.fields || {};
+          const itemFields = item.mapValue?.fields || {};
           return {
-            name: fields.name?.stringValue || "Unnamed Product",
-            price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
-            img: fields.img?.stringValue || "https://placehold.co/300x300?text=No+Photo",
+            name: itemFields.name?.stringValue || "Unnamed Product",
+            price: Number(itemFields.price?.doubleValue || itemFields.price?.integerValue || 0),
+            img: itemFields.img?.stringValue || "https://placehold.co/300x300?text=No+Photo",
           };
         });
 
@@ -82,8 +83,13 @@
       })
       .catch((err) => {
         console.error(err);
-        brandName.innerText = "Store Not Found";
-        productGrid.innerHTML = `<p style="text-align: center; color: #94a3b8; grid-column: 1/-1;">Could not load products for "${storeId}". Please check the URL parameter.</p>`;
+        brandName.innerText = "Store Not Published Yet";
+        productGrid.innerHTML = `
+          <div style="grid-column: 1/-1; text-align: center; padding: 40px 20px; color: #64748b;">
+            <p style="font-size: 16px; font-weight: 600; color: #0f172a; margin-bottom: 8px;">Store "${storeId}" was not found.</p>
+            <p style="font-size: 13px;">Please go back to the dashboard, enter <strong>${storeId}</strong>, add your products, and click <strong>"Publish All Changes to Storefront"</strong>.</p>
+          </div>
+        `;
       });
   }
 
@@ -92,7 +98,7 @@
     productGrid.innerHTML = "";
 
     if (items.length === 0) {
-      productGrid.innerHTML = `<p style="text-align: center; color: #94a3b8; grid-column: 1/-1;">No products available right now.</p>`;
+      productGrid.innerHTML = `<p style="text-align: center; color: #94a3b8; grid-column: 1/-1; padding: 30px;">No products published in this store yet.</p>`;
       return;
     }
 
@@ -112,7 +118,6 @@
       productGrid.appendChild(card);
     });
 
-    // Add to Cart Listeners
     document.querySelectorAll(".add-to-cart-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const name = e.target.getAttribute("data-name");
@@ -122,7 +127,7 @@
     });
   }
 
-  // Cart Management
+  // Cart Functions
   function addToCart(name, price) {
     const existing = cart.find((item) => item.name === name);
     if (existing) {
@@ -161,7 +166,6 @@
     cartBadge.innerText = count;
     cartTotal.innerText = `KSh ${total.toLocaleString()}`;
 
-    // Render Drawer Items
     cartItemsContainer.innerHTML = "";
 
     if (cart.length === 0) {
@@ -195,7 +199,7 @@
     });
   }
 
-  // Drawer Toggle Handlers
+  // Drawer Controls
   function openCart() {
     cartDrawer.classList.add("open");
     cartOverlay.style.display = "block";
@@ -210,7 +214,7 @@
   closeCartBtn.addEventListener("click", closeCart);
   cartOverlay.addEventListener("click", closeCart);
 
-  // WhatsApp Checkout Handler
+  // WhatsApp Checkout
   whatsappCheckoutBtn.addEventListener("click", () => {
     if (cart.length === 0) {
       alert("Your cart is empty.");
@@ -222,7 +226,7 @@
     const notes = custNotesInput.value.trim();
 
     if (!name || !address) {
-      alert("Please fill in your Name and Delivery Address.");
+      alert("Please enter your Full Name and Delivery Address.");
       return;
     }
 
@@ -249,7 +253,7 @@
     window.open(whatsappUrl, "_blank");
   });
 
-  // Initialize Page
+  // Init
   fetchStoreData();
   updateCartUI();
 })();
