@@ -35,12 +35,14 @@
 
     if (!storeId || !banner) return;
 
-    // Detect current path and point to index.html
+    // Build storefront link matching current path
     const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
     const fullUrl = `${window.location.origin}${basePath}/index.html?store=${encodeURIComponent(storeId)}`;
 
     if (urlText) urlText.innerText = fullUrl;
     if (visitBtn) visitBtn.href = fullUrl;
+    
+    // Force show banner
     banner.style.display = "flex";
   }
 
@@ -119,7 +121,7 @@
     statusMsg.style.backgroundColor = isError ? "#fef2f2" : "#f0fdf4";
     statusMsg.style.borderColor = isError ? "#fecaca" : "#bbf7d0";
     statusMsg.style.color = isError ? "#991b1b" : "#166534";
-    setTimeout(() => { statusMsg.style.display = "none"; }, 4000);
+    setTimeout(() => { statusMsg.style.display = "none"; }, 5000);
   }
 
   // Fetch Store Settings & Catalog from Firestore
@@ -134,11 +136,14 @@
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) throw new Error("Store not found or network error");
+        if (!res.ok) throw new Error("Store ID not found in database.");
         return res.json();
       })
       .then((doc) => {
-        if (!doc.fields) return;
+        if (!doc.fields) {
+          showStatus("Store document is empty.", true);
+          return;
+        }
 
         storePhoneInput.value = doc.fields.phone?.stringValue || "";
         storeSloganInput.value = doc.fields.slogan?.stringValue || "";
@@ -162,22 +167,23 @@
 
         renderProducts();
         updateStoreLinkBanner(storeId);
-        showStatus(`Loaded store settings and ${localItems.length} products.`);
+        showStatus(`Loaded store "${storeId}" with ${localItems.length} products!`);
       })
       .catch((err) => {
         console.error(err);
-        showStatus("Store ID not found in cloud. Ready to create new store.", false);
+        showStatus(`Store "${storeId}" does not exist in cloud yet. Save settings to create it!`, false);
+        updateStoreLinkBanner(storeId);
       });
   }
 
-  // Render Product Catalog
+  // Render Local Product List
   function renderProducts() {
     if (!productListContainer) return;
     productListContainer.innerHTML = "";
     if (prodCount) prodCount.innerText = localItems.length;
 
     if (localItems.length === 0) {
-      productListContainer.innerHTML = `<p style="color: #94a3b8; font-size: 13px; text-align: center; padding: 12px 0;">No products in list yet.</p>`;
+      productListContainer.innerHTML = `<p style="color: #94a3b8; font-size: 13px; text-align: center; padding: 12px 0;">No products added yet.</p>`;
       return;
     }
 
@@ -204,7 +210,7 @@
     });
   }
 
-  // Add Product to Local Array
+  // Add Item to Local List
   if (addProdBtn) {
     addProdBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -227,26 +233,25 @@
 
       renderProducts();
 
-      // Reset Inputs
       prodNameInput.value = "";
       prodPriceInput.value = "";
       if (prodImgFileInput) prodImgFileInput.value = "";
       currentProdImgBase64 = "";
       if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
 
-      showStatus(`Added "${name}" to list.`);
+      showStatus(`Added "${name}" to list. Click "Publish All Changes" to save online.`);
     });
   }
 
-  // Save Settings & Sync Catalog to Firestore
+  // Save/Publish to Firestore (Patch Document)
   function saveToCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
     const phone = storePhoneInput.value.trim();
     const slogan = storeSloganInput.value.trim();
-    const themeColor = storeThemeColorInput.value;
+    const themeColor = storeThemeColorInput.value || "#10b981";
 
     if (!storeId) {
-      showStatus("Please enter a Store ID.", true);
+      showStatus("Please enter a Store ID (e.g. aromatic-vibes).", true);
       return;
     }
 
@@ -255,8 +260,8 @@
     const formattedItems = localItems.map((item) => ({
       mapValue: {
         fields: {
-          name: { stringValue: item.name },
-          price: { doubleValue: item.price },
+          name: { stringValue: item.name || "" },
+          price: { doubleValue: Number(item.price) || 0 },
           img: { stringValue: item.img || "" },
         },
       },
@@ -264,9 +269,9 @@
 
     const payload = {
       fields: {
-        phone: { stringValue: phone },
-        slogan: { stringValue: slogan },
-        logo: { stringValue: currentLogoBase64 },
+        phone: { stringValue: phone || "" },
+        slogan: { stringValue: slogan || "" },
+        logo: { stringValue: currentLogoBase64 || "" },
         themeColor: { stringValue: themeColor },
         items: { arrayValue: { values: formattedItems } },
       },
@@ -278,16 +283,16 @@
       body: JSON.stringify(payload),
     })
       .then((res) => {
-        if (!res.ok) throw new Error("Failed to sync to Firestore");
+        if (!res.ok) throw new Error("Cloud save failed.");
         return res.json();
       })
       .then(() => {
         updateStoreLinkBanner(storeId);
-        showStatus("🚀 Store settings, branding, and catalog published successfully!");
+        showStatus(`🚀 Published successfully! Click the banner link to view your store.`);
       })
       .catch((err) => {
         console.error(err);
-        showStatus("Failed to publish to cloud.", true);
+        showStatus("Failed to publish to cloud. Check network or Firestore permissions.", true);
       });
   }
 
