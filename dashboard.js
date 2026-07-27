@@ -1,44 +1,27 @@
 (function () {
   const PROJECT_ID = "whatsapp-eco-engine-80882";
+  const DEFAULT_STORE_ID = "perfumescentre";
 
   // State Management
   let products = [];
   let availableCategories = ["Men", "Women", "Unisex", "Designer", "Niche"];
   let selectedCategories = [];
-
-  // Helper Elements
-  const storeIdInput = document.getElementById("store-id-input");
-  const storePhoneInput = document.getElementById("store-phone-input");
-  const storeSloganInput = document.getElementById("store-slogan-input");
-  const storeThemeColor = document.getElementById("store-theme-color");
-  const colorHexLabel = document.getElementById("color-hex-label");
-  const logoPreviewImg = document.getElementById("logo-preview-img");
-  const storeLogoFile = document.getElementById("store-logo-file");
-
-  const prodNameInput = document.getElementById("prod-name");
-  const prodStockSelect = document.getElementById("prod-stock");
-  const prodPreviewImg = document.getElementById("prod-preview-img");
-  const prodImgFile = document.getElementById("prod-img-file");
-  const prodCountLabel = document.getElementById("prod-count");
-  const productListContainer = document.getElementById("product-list-container");
-
-  const statusMsg = document.getElementById("status-msg");
-  const storeLinkBanner = document.getElementById("store-link-banner");
-  const storeUrlText = document.getElementById("store-url-text");
-  const visitStoreBtn = document.getElementById("visit-store-btn");
-  const copyLinkBtn = document.getElementById("copy-link-btn");
+  let editingIndex = null; // Track item being edited (null = adding new)
 
   let logoBase64 = "";
   let prodImageBase64 = "";
 
-  // Pre-fill default store ID
-  if (storeIdInput && !storeIdInput.value) {
-    storeIdInput.value = "perfumescentre";
-  }
+  // Helper: Element safe getter
+  const getEl = (id) => document.getElementById(id);
 
-  // Show status banner
+  // Status Banner display
   function showStatus(msg, type = "success") {
-    if (!statusMsg) return;
+    console.log(`[STATUS ${type.toUpperCase()}]:`, msg);
+    const statusMsg = getEl("status-msg");
+    if (!statusMsg) {
+      alert(`${type.toUpperCase()}: ${msg}`);
+      return;
+    }
     statusMsg.style.display = "block";
     statusMsg.innerText = msg;
     if (type === "success") {
@@ -50,11 +33,15 @@
       statusMsg.style.color = "#991b1b";
       statusMsg.style.borderColor = "#fecaca";
     }
-    setTimeout(() => { statusMsg.style.display = "none"; }, 6000);
+    setTimeout(() => { if (statusMsg) statusMsg.style.display = "none"; }, 6000);
   }
 
-  // Update live store link UI
+  // Update Live Link
   function updateStoreLinkBanner(storeId) {
+    const storeLinkBanner = getEl("store-link-banner");
+    const storeUrlText = getEl("store-url-text");
+    const visitStoreBtn = getEl("visit-store-btn");
+
     if (!storeId) {
       if (storeLinkBanner) storeLinkBanner.style.display = "none";
       return;
@@ -65,63 +52,112 @@
     if (storeLinkBanner) storeLinkBanner.style.display = "flex";
   }
 
-  if (copyLinkBtn) {
-    copyLinkBtn.addEventListener("click", () => {
-      const url = storeUrlText?.innerText;
-      if (url) {
-        navigator.clipboard.writeText(url);
-        showStatus("Storefront link copied to clipboard!");
-      }
-    });
+  // MAIN FETCH FUNCTION
+  function fetchFromCloud() {
+    const storeIdInput = getEl("store-id-input");
+    const storeId = (storeIdInput?.value || DEFAULT_STORE_ID).trim().toLowerCase();
+
+    showStatus(`⏳ Connecting to Cloud for "${storeId}"...`, "success");
+
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
+
+    fetch(firestoreUrl)
+      .then((res) => {
+        if (res.status === 404) {
+          throw new Error(`Store "${storeId}" is not published in Firestore yet. Add your items below and click "Publish All Changes" to create it!`);
+        }
+        if (!res.ok) {
+          throw new Error(`HTTP Error ${res.status} while fetching store data.`);
+        }
+        return res.json();
+      })
+      .then((doc) => {
+        if (!doc || !doc.fields) {
+          throw new Error(`Document for "${storeId}" exists but contains no fields.`);
+        }
+
+        const fields = doc.fields;
+
+        // 1. Phone & Slogan
+        const phoneEl = getEl("store-phone-input");
+        const sloganEl = getEl("store-slogan-input");
+        if (phoneEl) phoneEl.value = fields.phone?.stringValue || "";
+        if (sloganEl) sloganEl.value = fields.slogan?.stringValue || "";
+
+        // 2. Theme Color
+        const themeColor = fields.themeColor?.stringValue || "#10b981";
+        const themeEl = getEl("store-theme-color");
+        const hexEl = getEl("color-hex-label");
+        if (themeEl) themeEl.value = themeColor;
+        if (hexEl) hexEl.innerText = themeColor;
+
+        // 3. Logo
+        logoBase64 = fields.logo?.stringValue || "";
+        const logoImg = getEl("logo-preview-img");
+        if (logoImg) {
+          logoImg.src = logoBase64 || "https://placehold.co/100x100?text=Logo";
+        }
+
+        // 4. Products Array Parsing
+        const rawItems = fields.items?.arrayValue?.values || [];
+
+        products = rawItems.map((item, index) => {
+          const f = item.mapValue?.fields || {};
+
+          let cats = [];
+          if (f.categories?.arrayValue?.values) {
+            cats = f.categories.arrayValue.values.map((v) => v.stringValue).filter(Boolean);
+          } else if (f.category?.stringValue) {
+            cats = [f.category.stringValue];
+          }
+
+          cats.forEach((c) => {
+            if (c && !availableCategories.includes(c)) availableCategories.push(c);
+          });
+
+          let variantsList = [];
+          if (f.variants?.arrayValue?.values) {
+            variantsList = f.variants.arrayValue.values.map((v) => {
+              const vf = v.mapValue?.fields || {};
+              return {
+                size: vf.size?.stringValue || "Standard",
+                price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
+              };
+            });
+          }
+
+          const basePrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
+          if (variantsList.length === 0) {
+            variantsList = [{ size: "Standard", price: basePrice }];
+          }
+
+          return {
+            name: f.name?.stringValue || `Product ${index + 1}`,
+            categories: cats.length ? cats : ["General"],
+            variants: variantsList,
+            stock: f.stock?.stringValue || "instock",
+            img: f.img?.stringValue || "https://placehold.co/100x100?text=Product"
+          };
+        });
+
+        renderCategoryTags();
+        renderProductList();
+        updateStoreLinkBanner(storeId);
+        showStatus(`🎉 Loaded store data for "${storeId}" (${products.length} products found)!`);
+      })
+      .catch((err) => {
+        showStatus(err.message, "error");
+      });
   }
 
-  if (storeThemeColor) {
-    storeThemeColor.addEventListener("input", (e) => {
-      if (colorHexLabel) colorHexLabel.innerText = e.target.value;
-    });
-  }
-
-  // Handle Image Conversions
-  if (storeLogoFile) {
-    storeLogoFile.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          logoBase64 = evt.target.result;
-          if (logoPreviewImg) logoPreviewImg.src = logoBase64;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
-  if (prodImgFile) {
-    prodImgFile.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          prodImageBase64 = evt.target.result;
-          if (prodPreviewImg) prodPreviewImg.src = prodImageBase64;
-        };
-        reader.readAsDataURL(file);
-      }
-    });
-  }
-
-  // --- VARIANT MANAGEMENT ---
+  // --- VARIANT UI ---
   function renderVariantRows(variants = []) {
-    const container = document.getElementById("variants-container");
+    const container = getEl("variants-container");
     if (!container) return;
     container.innerHTML = "";
 
     if (variants.length === 0) {
-      variants = [
-        { size: "30ml", price: "" },
-        { size: "50ml", price: "" },
-        { size: "100ml", price: "" }
-      ];
+      variants = [{ size: "100ml", price: "" }];
     }
 
     variants.forEach((v) => {
@@ -131,25 +167,6 @@
       row.innerHTML = `
         <input type="text" class="variant-size" placeholder="Size (e.g. 100ml)" value="${v.size || ""}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
         <input type="number" class="variant-price" placeholder="Price (KSh)" value="${v.price || ""}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
-        <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
-      `;
-      container.appendChild(row);
-
-      row.querySelector(".remove-variant-btn").addEventListener("click", () => row.remove());
-    });
-  }
-
-  const addVariantBtn = document.getElementById("add-variant-btn");
-  if (addVariantBtn) {
-    addVariantBtn.addEventListener("click", () => {
-      const container = document.getElementById("variants-container");
-      if (!container) return;
-      const row = document.createElement("div");
-      row.className = "variant-row";
-      row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
-      row.innerHTML = `
-        <input type="text" class="variant-size" placeholder="Size (e.g. 250ml)" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
-        <input type="number" class="variant-price" placeholder="Price (KSh)" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
         <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
       `;
       container.appendChild(row);
@@ -163,16 +180,14 @@
     rows.forEach((row) => {
       const size = row.querySelector(".variant-size")?.value.trim();
       const price = Number(row.querySelector(".variant-price")?.value || 0);
-      if (size && price > 0) {
-        variants.push({ size, price });
-      }
+      if (size && price > 0) variants.push({ size, price });
     });
     return variants;
   }
 
-  // --- CATEGORY TAG MANAGEMENT ---
+  // --- CATEGORY UI ---
   function renderCategoryTags() {
-    const list = document.getElementById("category-tags-list");
+    const list = getEl("category-tags-list");
     if (!list) return;
     list.innerHTML = "";
 
@@ -202,187 +217,66 @@
     });
   }
 
-  const addCategoryTagBtn = document.getElementById("add-category-tag-btn");
-  if (addCategoryTagBtn) {
-    addCategoryTagBtn.addEventListener("click", () => {
-      const newCatInput = document.getElementById("prod-new-category-input");
-      const catVal = newCatInput?.value.trim();
-      if (catVal) {
-        if (!availableCategories.includes(catVal)) {
-          availableCategories.push(catVal);
-        }
-        if (!selectedCategories.includes(catVal)) {
-          selectedCategories.push(catVal);
-        }
-        newCatInput.value = "";
-        renderCategoryTags();
-      }
-    });
-  }
+  // --- EDIT PRODUCT LOGIC ---
+  function startEditingProduct(index) {
+    const item = products[index];
+    if (!item) return;
 
-  // --- FETCH FROM CLOUD ---
-  const fetchCloudBtn = document.getElementById("fetch-cloud-btn");
-  if (fetchCloudBtn) {
-    fetchCloudBtn.addEventListener("click", fetchFromCloud);
-  }
+    editingIndex = index;
 
-  function fetchFromCloud() {
-    const storeId = storeIdInput?.value.trim().toLowerCase();
-    if (!storeId) {
-      showStatus("Please enter a Store ID (e.g., perfumescentre) to fetch.", "error");
-      return;
+    // Fill form fields
+    if (getEl("prod-name")) getEl("prod-name").value = item.name;
+    if (getEl("prod-stock")) getEl("prod-stock").value = item.stock;
+
+    prodImageBase64 = item.img;
+    if (getEl("prod-preview-img")) getEl("prod-preview-img").src = item.img;
+
+    selectedCategories = [...item.categories];
+    renderCategoryTags();
+    renderVariantRows(item.variants);
+
+    // Update Button UI
+    const addBtn = getEl("add-prod-btn");
+    if (addBtn) {
+      addBtn.innerText = "💾 Save Edits to Product";
+      addBtn.style.background = "#2563eb";
+      addBtn.style.color = "#ffffff";
     }
 
-    showStatus(`Fetching data for "${storeId}"...`, "success");
-
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
-
-    fetch(firestoreUrl)
-      .then((res) => {
-        if (res.status === 404) {
-          throw new Error(`Store "${storeId}" was not found in Cloud. If this is a new store ID, fill in the details below and click 'Publish All Changes' to create it!`);
-        }
-        if (!res.ok) {
-          throw new Error(`Cloud Error (HTTP ${res.status}). Could not fetch store data.`);
-        }
-        return res.json();
-      })
-      .then((doc) => {
-        if (!doc.fields) {
-          throw new Error(`Store "${storeId}" exists but contains no saved fields.`);
-        }
-
-        const fields = doc.fields;
-
-        // Phone & Slogan
-        if (storePhoneInput) storePhoneInput.value = fields.phone?.stringValue || "";
-        if (storeSloganInput) storeSloganInput.value = fields.slogan?.stringValue || "";
-        
-        // Theme
-        const themeColor = fields.themeColor?.stringValue || "#10b981";
-        if (storeThemeColor) storeThemeColor.value = themeColor;
-        if (colorHexLabel) colorHexLabel.innerText = themeColor;
-
-        // Logo
-        logoBase64 = fields.logo?.stringValue || "";
-        if (logoPreviewImg) {
-          logoPreviewImg.src = logoBase64 || "https://placehold.co/100x100?text=Logo";
-        }
-
-        // Products
-        const rawItems = fields.items?.arrayValue?.values || [];
-        products = rawItems.map((item) => {
-          const f = item.mapValue?.fields || {};
-
-          // Categories
-          let cats = [];
-          if (f.categories?.arrayValue?.values) {
-            cats = f.categories.arrayValue.values.map((v) => v.stringValue).filter(Boolean);
-          } else if (f.category?.stringValue) {
-            cats = [f.category.stringValue];
-          }
-
-          cats.forEach((c) => {
-            if (!availableCategories.includes(c)) availableCategories.push(c);
-          });
-
-          // Variants
-          let variantsList = [];
-          if (f.variants?.arrayValue?.values) {
-            variantsList = f.variants.arrayValue.values.map((v) => {
-              const vf = v.mapValue?.fields || {};
-              return {
-                size: vf.size?.stringValue || "",
-                price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
-              };
-            });
-          }
-
-          const basePrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
-          if (variantsList.length === 0) {
-            variantsList = [{ size: "Standard", price: basePrice }];
-          }
-
-          return {
-            name: f.name?.stringValue || "Unnamed Product",
-            categories: cats.length ? cats : ["General"],
-            variants: variantsList,
-            stock: f.stock?.stringValue || "instock",
-            img: f.img?.stringValue || "https://placehold.co/100x100?text=Product"
-          };
-        });
-
-        renderCategoryTags();
-        renderProductList();
-        updateStoreLinkBanner(storeId);
-        showStatus(`🎉 Successfully loaded all data for store "${storeId}"!`);
-      })
-      .catch((err) => {
-        console.error("Fetch Cloud Error:", err);
-        showStatus(err.message, "error");
-      });
+    showStatus(`Editing "${item.name}". Update the fields and click "Save Edits".`, "success");
   }
 
-  // --- SAVE STORE SETTINGS ---
-  const saveSettingsBtn = document.getElementById("save-settings-btn");
-  if (saveSettingsBtn) {
-    saveSettingsBtn.addEventListener("click", () => {
-      const storeId = storeIdInput?.value.trim().toLowerCase();
-      if (!storeId) {
-        showStatus("Store ID is required.", "error");
-        return;
-      }
-      updateStoreLinkBanner(storeId);
-      showStatus("Store settings saved locally. Click 'Publish All Changes' below to save to cloud.");
-    });
+  function resetProductForm() {
+    editingIndex = null;
+
+    if (getEl("prod-name")) getEl("prod-name").value = "";
+    if (getEl("prod-stock")) getEl("prod-stock").value = "instock";
+    prodImageBase64 = "";
+
+    if (getEl("prod-preview-img")) {
+      getEl("prod-preview-img").src = "https://placehold.co/100x100?text=Product";
+    }
+
+    selectedCategories = [];
+    renderCategoryTags();
+    renderVariantRows();
+
+    const addBtn = getEl("add-prod-btn");
+    if (addBtn) {
+      addBtn.innerText = "+ Add Product to List";
+      addBtn.style.background = "#f1f5f9";
+      addBtn.style.color = "#334155";
+    }
   }
 
-  // --- ADD PRODUCT TO LIST ---
-  const addProdBtn = document.getElementById("add-prod-btn");
-  if (addProdBtn) {
-    addProdBtn.addEventListener("click", () => {
-      const name = prodNameInput?.value.trim();
-      const stock = prodStockSelect?.value;
-      const variants = getVariantsFromForm();
-
-      if (!name) {
-        showStatus("Please enter a product name.", "error");
-        return;
-      }
-
-      if (variants.length === 0) {
-        showStatus("Please enter at least one size variant with a price.", "error");
-        return;
-      }
-
-      const newProduct = {
-        name,
-        categories: selectedCategories.length ? [...selectedCategories] : ["General"],
-        variants,
-        stock,
-        img: prodImageBase64 || "https://placehold.co/100x100?text=Product"
-      };
-
-      products.push(newProduct);
-
-      // Reset
-      if (prodNameInput) prodNameInput.value = "";
-      prodImageBase64 = "";
-      if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
-      selectedCategories = [];
-      renderCategoryTags();
-      renderVariantRows();
-      renderProductList();
-
-      showStatus(`Added "${name}" to your local catalog list.`);
-    });
-  }
-
+  // --- CATALOG LIST UI ---
   function renderProductList() {
-    if (!productListContainer) return;
-    productListContainer.innerHTML = "";
+    const productListContainer = getEl("product-list-container");
+    const prodCountLabel = getEl("prod-count");
 
     if (prodCountLabel) prodCountLabel.innerText = products.length;
+    if (!productListContainer) return;
+    productListContainer.innerHTML = "";
 
     if (products.length === 0) {
       productListContainer.innerHTML = `<p style="text-align: center; color: #94a3b8; padding: 20px 0; font-size: 13px;">No items in catalog yet.</p>`;
@@ -403,34 +297,41 @@
         <div>
           <span class="badge badge-${p.stock}">${p.stock}</span>
         </div>
-        <button class="del-btn" data-index="${index}" title="Remove Product">🗑️</button>
+        <div style="display: flex; gap: 6px;">
+          <button class="edit-btn" data-index="${index}" title="Edit Item" style="background: #e0f2fe; color: #0369a1; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; font-weight: 600;">✏️ Edit</button>
+          <button class="del-btn" data-index="${index}" title="Remove Item" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #ef4444;">🗑️</button>
+        </div>
       `;
       productListContainer.appendChild(row);
     });
 
+    // Wire up Edit buttons
+    document.querySelectorAll(".edit-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        const idx = Number(e.currentTarget.getAttribute("data-index"));
+        startEditingProduct(idx);
+      });
+    });
+
+    // Wire up Delete buttons
     document.querySelectorAll(".del-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = Number(e.currentTarget.getAttribute("data-index"));
+        const removedName = products[idx]?.name || "Item";
         products.splice(idx, 1);
+        if (editingIndex === idx) resetProductForm();
         renderProductList();
+        showStatus(`Removed "${removedName}" from catalog.`);
       });
     });
   }
 
   // --- PUBLISH TO CLOUD ---
-  const syncCloudBtn = document.getElementById("sync-cloud-btn");
-  if (syncCloudBtn) {
-    syncCloudBtn.addEventListener("click", syncToCloud);
-  }
-
   function syncToCloud() {
-    const storeId = storeIdInput?.value.trim().toLowerCase();
-    if (!storeId) {
-      showStatus("Store ID is required to publish.", "error");
-      return;
-    }
+    const storeIdInput = getEl("store-id-input");
+    const storeId = (storeIdInput?.value || DEFAULT_STORE_ID).trim().toLowerCase();
 
-    showStatus(`Publishing changes for "${storeId}"...`, "success");
+    showStatus(`🚀 Publishing changes for "${storeId}"...`, "success");
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
@@ -461,9 +362,9 @@
 
     const payload = {
       fields: {
-        phone: { stringValue: storePhoneInput?.value.trim() || "" },
-        slogan: { stringValue: storeSloganInput?.value.trim() || "" },
-        themeColor: { stringValue: storeThemeColor?.value || "#10b981" },
+        phone: { stringValue: getEl("store-phone-input")?.value.trim() || "" },
+        slogan: { stringValue: getEl("store-slogan-input")?.value.trim() || "" },
+        themeColor: { stringValue: getEl("store-theme-color")?.value || "#10b981" },
         logo: { stringValue: logoBase64 || "" },
         items: { arrayValue: { values: itemsPayload } }
       }
@@ -475,21 +376,134 @@
       body: JSON.stringify(payload)
     })
       .then((res) => {
-        if (!res.ok) throw new Error(`Publish failed with status code ${res.status}`);
+        if (!res.ok) throw new Error(`Publish failed (HTTP ${res.status})`);
         return res.json();
       })
       .then(() => {
         updateStoreLinkBanner(storeId);
-        showStatus(`🚀 Successfully published store "${storeId}" to the cloud!`);
+        showStatus(`🎉 Successfully published store "${storeId}" to the cloud!`);
       })
       .catch((err) => {
-        console.error("Publish Error:", err);
         showStatus(`Failed to publish: ${err.message}`, "error");
       });
   }
 
-  // Initial Setup
-  renderVariantRows();
-  renderCategoryTags();
-  renderProductList();
+  // --- INITIALIZATION ---
+  window.addEventListener("DOMContentLoaded", () => {
+    const storeIdInput = getEl("store-id-input");
+    if (storeIdInput && !storeIdInput.value) {
+      storeIdInput.value = DEFAULT_STORE_ID;
+    }
+
+    // File input preview listeners
+    const logoFileInput = getEl("store-logo-file");
+    if (logoFileInput) {
+      logoFileInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            logoBase64 = evt.target.result;
+            const preview = getEl("logo-preview-img");
+            if (preview) preview.src = logoBase64;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    const prodImgInput = getEl("prod-img-file");
+    if (prodImgInput) {
+      prodImgInput.addEventListener("change", (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            prodImageBase64 = evt.target.result;
+            const preview = getEl("prod-preview-img");
+            if (preview) preview.src = prodImageBase64;
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+
+    const fetchBtn = getEl("fetch-cloud-btn");
+    if (fetchBtn) fetchBtn.addEventListener("click", fetchFromCloud);
+
+    const syncBtn = getEl("sync-cloud-btn");
+    if (syncBtn) syncBtn.addEventListener("click", syncToCloud);
+
+    const addVariantBtn = getEl("add-variant-btn");
+    if (addVariantBtn) {
+      addVariantBtn.addEventListener("click", () => {
+        const container = getEl("variants-container");
+        if (!container) return;
+        const row = document.createElement("div");
+        row.className = "variant-row";
+        row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
+        row.innerHTML = `
+          <input type="text" class="variant-size" placeholder="Size (e.g. 50ml)" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+          <input type="number" class="variant-price" placeholder="Price (KSh)" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+          <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
+        `;
+        container.appendChild(row);
+        row.querySelector(".remove-variant-btn").addEventListener("click", () => row.remove());
+      });
+    }
+
+    const addCatBtn = getEl("add-category-tag-btn");
+    if (addCatBtn) {
+      addCatBtn.addEventListener("click", () => {
+        const newCatInput = getEl("prod-new-category-input");
+        const catVal = newCatInput?.value.trim();
+        if (catVal) {
+          if (!availableCategories.includes(catVal)) availableCategories.push(catVal);
+          if (!selectedCategories.includes(catVal)) selectedCategories.push(catVal);
+          newCatInput.value = "";
+          renderCategoryTags();
+        }
+      });
+    }
+
+    const addProdBtn = getEl("add-prod-btn");
+    if (addProdBtn) {
+      addProdBtn.addEventListener("click", () => {
+        const name = getEl("prod-name")?.value.trim();
+        const stock = getEl("prod-stock")?.value;
+        const variants = getVariantsFromForm();
+
+        if (!name) return showStatus("Please enter a product name.", "error");
+        if (variants.length === 0) return showStatus("Please enter at least one size variant with a price.", "error");
+
+        const productData = {
+          name,
+          categories: selectedCategories.length ? [...selectedCategories] : ["General"],
+          variants,
+          stock,
+          img: prodImageBase64 || "https://placehold.co/100x100?text=Product"
+        };
+
+        if (editingIndex !== null) {
+          // Updating existing product
+          products[editingIndex] = productData;
+          showStatus(`Updated "${name}".`);
+        } else {
+          // Adding new product
+          products.push(productData);
+          showStatus(`Added "${name}" to list.`);
+        }
+
+        resetProductForm();
+        renderProductList();
+      });
+    }
+
+    renderVariantRows();
+    renderCategoryTags();
+    renderProductList();
+
+    // Auto-fetch on load
+    fetchFromCloud();
+  });
 })();
