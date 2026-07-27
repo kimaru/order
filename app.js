@@ -7,42 +7,34 @@
   let activeCategory = "All";
   let storePhone = "";
 
-  // DOM Elements
-  const loadingState = document.getElementById("loading-state");
-  const storeContent = document.getElementById("store-content");
-  const storeLogoImg = document.getElementById("store-logo-img");
-  const storeTitle = document.getElementById("store-title");
-  const storeSlogan = document.getElementById("store-slogan");
-
-  const categoriesBar = document.getElementById("categories-bar");
-  const productGrid = document.getElementById("product-grid");
-
-  const cartDrawer = document.getElementById("cart-drawer");
-  const cartOverlay = document.getElementById("cart-overlay");
-  const cartToggleBtn = document.getElementById("cart-toggle-btn");
-  const closeCartBtn = document.getElementById("close-cart-btn");
-  const cartItemsContainer = document.getElementById("cart-items-container");
-  const cartCountBadge = document.getElementById("cart-count-badge");
-  const cartTotalText = document.getElementById("cart-total-text");
-  const whatsappCheckoutBtn = document.getElementById("whatsapp-checkout-btn");
-
-  // 1. Get Store ID from URL Query Parameters (?store=your-id)
-  function getStoreIdFromUrl() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("store") ? params.get("store").toLowerCase().trim() : null;
+  // Helper to safely set innerText without crashing if element is missing
+  function setText(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = text;
   }
 
-  // 2. Fetch and Parse Store Data from Firestore
+  // 1. Extract Store ID from URL
+  function getStoreIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const storeParam = params.get("store");
+    return storeParam ? storeParam.toLowerCase().trim() : null;
+  }
+
+  // 2. Fetch and Parse Store Data from Firestore REST API
   function fetchStoreData(storeId) {
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) throw new Error("Store non-existent or network error.");
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: Store ID "${storeId}" was not found.`);
+        }
         return res.json();
       })
       .then((doc) => {
-        if (!doc.fields) throw new Error("Store data corrupted or empty.");
+        if (!doc || !doc.fields) {
+          throw new Error("Store data exists but contains no fields. Save from dashboard first.");
+        }
 
         // Store Settings
         storePhone = doc.fields.phone?.stringValue || "";
@@ -53,19 +45,21 @@
         // Apply Theme Accent Color
         document.documentElement.style.setProperty("--accent-color", themeColor);
 
-        // Update Header UI
-        if (storeSlogan) storeSlogan.innerText = slogan;
-        if (storeTitle) storeTitle.innerText = storeId.toUpperCase();
-        if (storeLogoImg) {
+        // Header UI Updates
+        setText("store-slogan", slogan);
+        setText("store-title", storeId.toUpperCase());
+        
+        const logoImg = document.getElementById("store-logo-img");
+        if (logoImg) {
           if (logoUrl) {
-            storeLogoImg.src = logoUrl;
-            storeLogoImg.style.display = "block";
+            logoImg.src = logoUrl;
+            logoImg.style.display = "block";
           } else {
-            storeLogoImg.style.display = "none";
+            logoImg.style.display = "none";
           }
         }
 
-        // Parse Products safely (Handles both legacy string category & array categories)
+        // --- Safe Product Array Parsing ---
         const rawItems = doc.fields.items?.arrayValue?.values || [];
 
         allProducts = rawItems.map((item) => {
@@ -73,18 +67,18 @@
 
           let cats = [];
 
-          // Case A: Saved as array of string values
+          // Multi-category array
           if (fields.categories?.arrayValue?.values) {
             cats = fields.categories.arrayValue.values
               .map((v) => v.stringValue)
               .filter(Boolean);
           }
-          // Case B: Fallback for older single-string entries
+          // Legacy single string fallback
           else if (fields.category?.stringValue) {
             cats = [fields.category.stringValue];
           }
 
-          // Case C: Fallback default
+          // Default fallback
           if (!cats || cats.length === 0) {
             cats = ["General"];
           }
@@ -98,7 +92,10 @@
           };
         });
 
-        // Hide Loading State & Show Store Content
+        // Reveal UI
+        const loadingState = document.getElementById("loading-state");
+        const storeContent = document.getElementById("store-content");
+
         if (loadingState) loadingState.style.display = "none";
         if (storeContent) storeContent.style.display = "block";
 
@@ -106,12 +103,15 @@
         renderProducts();
       })
       .catch((err) => {
-        console.error("Store Load Error:", err);
+        console.error("Storefront Load Failed:", err);
+        const loadingState = document.getElementById("loading-state");
         if (loadingState) {
+          loadingState.style.display = "block";
           loadingState.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: #991b1b;">
-              <p style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">⚠️ Store Not Found</p>
-              <p style="font-size: 14px; color: #64748b;">Could not load store "${storeId}". Make sure you saved and published from the dashboard first.</p>
+            <div style="text-align: center; padding: 40px 20px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; margin: 20px auto; max-width: 480px;">
+              <p style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">⚠️ Could Not Load Store</p>
+              <p style="font-size: 13px; color: #7f1d1d; margin-bottom: 12px;">${err.message}</p>
+              <p style="font-size: 12px; color: #64748b;">Make sure you entered your Store ID in the Dashboard and clicked <b>"Publish All Changes"</b>.</p>
             </div>
           `;
         }
@@ -120,10 +120,10 @@
 
   // 3. Render Filter Category Chips
   function renderCategories() {
+    const categoriesBar = document.getElementById("categories-bar");
     if (!categoriesBar) return;
     categoriesBar.innerHTML = "";
 
-    // Extract unique categories across all items
     const catSet = new Set(["All"]);
     allProducts.forEach((product) => {
       if (Array.isArray(product.categories)) {
@@ -144,12 +144,12 @@
     });
   }
 
-  // 4. Render Product Grid
+  // 4. Render Products Grid
   function renderProducts() {
+    const productGrid = document.getElementById("product-grid");
     if (!productGrid) return;
     productGrid.innerHTML = "";
 
-    // Filter products matching activeCategory
     const filteredProducts =
       activeCategory === "All"
         ? allProducts
@@ -193,7 +193,6 @@
       productGrid.appendChild(card);
     });
 
-    // Attach Add to Cart Listeners
     document.querySelectorAll(".add-to-cart-btn:not([disabled])").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const name = decodeURIComponent(e.currentTarget.getAttribute("data-name"));
@@ -203,10 +202,9 @@
     });
   }
 
-  // 5. Cart Operations
+  // 5. Cart Logic
   function addToCart(name, price) {
     const existingIndex = cart.findIndex((item) => item.name === name);
-
     if (existingIndex > -1) {
       cart[existingIndex].qty += 1;
     } else {
@@ -228,6 +226,7 @@
   }
 
   function updateCartUI() {
+    const cartItemsContainer = document.getElementById("cart-items-container");
     if (!cartItemsContainer) return;
     cartItemsContainer.innerHTML = "";
 
@@ -242,7 +241,6 @@
         totalPrice += item.price * item.qty;
 
         const row = document.createElement("div");
-        row.className = "cart-item-row";
         row.style.cssText = "display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid #f1f5f9;";
         row.innerHTML = `
           <div>
@@ -259,10 +257,9 @@
       });
     }
 
-    if (cartCountBadge) cartCountBadge.innerText = totalItems;
-    if (cartTotalText) cartTotalText.innerText = `KSh ${totalPrice.toLocaleString()}`;
+    setText("cart-count-badge", totalItems);
+    setText("cart-total-text", `KSh ${totalPrice.toLocaleString()}`);
 
-    // Attach Quantity Listeners
     document.querySelectorAll(".minus-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = Number(e.currentTarget.getAttribute("data-index"));
@@ -279,7 +276,10 @@
   }
 
   function toggleCartDrawer(open) {
+    const cartDrawer = document.getElementById("cart-drawer");
+    const cartOverlay = document.getElementById("cart-overlay");
     if (!cartDrawer || !cartOverlay) return;
+
     if (open) {
       cartDrawer.classList.add("open");
       cartOverlay.classList.add("open");
@@ -289,7 +289,7 @@
     }
   }
 
-  // 6. WhatsApp Order Checkout
+  // 6. WhatsApp Checkout
   function checkoutToWhatsApp() {
     if (cart.length === 0) {
       alert("Your cart is empty!");
@@ -318,22 +318,29 @@
     window.open(waUrl, "_blank");
   }
 
-  // Initial Event Attachments
+  // Bind Buttons Safely
+  const cartToggleBtn = document.getElementById("cart-toggle-btn");
+  const closeCartBtn = document.getElementById("close-cart-btn");
+  const cartOverlay = document.getElementById("cart-overlay");
+  const whatsappCheckoutBtn = document.getElementById("whatsapp-checkout-btn");
+
   if (cartToggleBtn) cartToggleBtn.addEventListener("click", () => toggleCartDrawer(true));
   if (closeCartBtn) closeCartBtn.addEventListener("click", () => toggleCartDrawer(false));
   if (cartOverlay) cartOverlay.addEventListener("click", () => toggleCartDrawer(false));
   if (whatsappCheckoutBtn) whatsappCheckoutBtn.addEventListener("click", checkoutToWhatsApp);
 
-  // App Initialization
-  const currentStoreId = getStoreIdFromUrl();
-  if (currentStoreId) {
-    fetchStoreData(currentStoreId);
+  // Initialize App
+  const storeId = getStoreIdFromUrl();
+  if (storeId) {
+    fetchStoreData(storeId);
   } else {
+    const loadingState = document.getElementById("loading-state");
     if (loadingState) {
+      loadingState.style.display = "block";
       loadingState.innerHTML = `
         <div style="text-align: center; padding: 40px 20px; color: #64748b;">
-          <p style="font-size: 16px; font-weight: 600;">No Store Selected</p>
-          <p style="font-size: 13px; margin-top: 4px;">Please open the store link from your dashboard.</p>
+          <p style="font-size: 16px; font-weight: 600;">No Store Specified in URL</p>
+          <p style="font-size: 13px; margin-top: 4px;">Please open the link directly from your dashboard (e.g. <code>index.html?store=aromatic-vibes</code>).</p>
         </div>
       `;
     }
