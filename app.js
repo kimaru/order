@@ -7,92 +7,86 @@
   let activeCategory = "All";
   let storePhone = "";
 
-  // Helper to safely set innerText without crashing if element is missing
   function setText(id, text) {
     const el = document.getElementById(id);
     if (el) el.innerText = text;
   }
 
-  // 1. Extract Store ID from URL
   function getStoreIdFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const storeParam = params.get("store");
     return storeParam ? storeParam.toLowerCase().trim() : null;
   }
 
-  // 2. Fetch and Parse Store Data from Firestore REST API
   function fetchStoreData(storeId) {
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}: Store ID "${storeId}" was not found.`);
-        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}: Store ID "${storeId}" was not found.`);
         return res.json();
       })
       .then((doc) => {
-        if (!doc || !doc.fields) {
-          throw new Error("Store data exists but contains no fields. Save from dashboard first.");
-        }
+        if (!doc || !doc.fields) throw new Error("Store data exists but contains no fields.");
 
-        // Store Settings
         storePhone = doc.fields.phone?.stringValue || "";
         const slogan = doc.fields.slogan?.stringValue || "Welcome to our store!";
         const themeColor = doc.fields.themeColor?.stringValue || "#10b981";
         const logoUrl = doc.fields.logo?.stringValue || "";
 
-        // Apply Theme Accent Color
         document.documentElement.style.setProperty("--accent-color", themeColor);
-
-        // Header UI Updates
         setText("store-slogan", slogan);
         setText("store-title", storeId.toUpperCase());
-        
+
         const logoImg = document.getElementById("store-logo-img");
         if (logoImg) {
-          if (logoUrl) {
-            logoImg.src = logoUrl;
-            logoImg.style.display = "block";
-          } else {
-            logoImg.style.display = "none";
-          }
+          logoImg.src = logoUrl;
+          logoImg.style.display = logoUrl ? "block" : "none";
         }
 
-        // --- Safe Product Array Parsing ---
         const rawItems = doc.fields.items?.arrayValue?.values || [];
 
-        allProducts = rawItems.map((item) => {
+        allProducts = rawItems.map((item, index) => {
           const fields = item.mapValue?.fields || {};
 
+          // Parse Categories
           let cats = [];
-
-          // Multi-category array
           if (fields.categories?.arrayValue?.values) {
-            cats = fields.categories.arrayValue.values
-              .map((v) => v.stringValue)
-              .filter(Boolean);
-          }
-          // Legacy single string fallback
-          else if (fields.category?.stringValue) {
+            cats = fields.categories.arrayValue.values.map((v) => v.stringValue).filter(Boolean);
+          } else if (fields.category?.stringValue) {
             cats = [fields.category.stringValue];
           }
+          if (!cats.length) cats = ["General"];
 
-          // Default fallback
-          if (!cats || cats.length === 0) {
-            cats = ["General"];
+          // Parse Variants
+          let variantsList = [];
+          if (fields.variants?.arrayValue?.values) {
+            variantsList = fields.variants.arrayValue.values.map((v) => {
+              const vf = v.mapValue?.fields || {};
+              return {
+                size: vf.size?.stringValue || "Standard",
+                price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
+              };
+            });
+          }
+
+          // Fallback if no variants exist
+          const basePrice = Number(fields.price?.doubleValue || fields.price?.integerValue || 0);
+          if (variantsList.length === 0) {
+            variantsList = [{ size: "Standard", price: basePrice }];
           }
 
           return {
+            id: `prod-${index}`,
             name: fields.name?.stringValue || "Unnamed Product",
-            price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
+            basePrice: basePrice,
             categories: cats,
+            variants: variantsList,
             stock: fields.stock?.stringValue || "instock",
-            img: fields.img?.stringValue || "https://placehold.co/300x300?text=No+Photo",
+            img: fields.img?.stringValue || "https://placehold.co/300x300?text=No+Photo"
           };
         });
 
-        // Reveal UI
         const loadingState = document.getElementById("loading-state");
         const storeContent = document.getElementById("store-content");
 
@@ -110,26 +104,20 @@
           loadingState.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: #991b1b; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; margin: 20px auto; max-width: 480px;">
               <p style="font-size: 18px; font-weight: 700; margin-bottom: 8px;">⚠️ Could Not Load Store</p>
-              <p style="font-size: 13px; color: #7f1d1d; margin-bottom: 12px;">${err.message}</p>
-              <p style="font-size: 12px; color: #64748b;">Make sure you entered your Store ID in the Dashboard and clicked <b>"Publish All Changes"</b>.</p>
+              <p style="font-size: 13px; color: #7f1d1d;">${err.message}</p>
             </div>
           `;
         }
       });
   }
 
-  // 3. Render Filter Category Chips
   function renderCategories() {
     const categoriesBar = document.getElementById("categories-bar");
     if (!categoriesBar) return;
     categoriesBar.innerHTML = "";
 
     const catSet = new Set(["All"]);
-    allProducts.forEach((product) => {
-      if (Array.isArray(product.categories)) {
-        product.categories.forEach((cat) => catSet.add(cat));
-      }
-    });
+    allProducts.forEach((p) => p.categories.forEach((cat) => catSet.add(cat)));
 
     catSet.forEach((cat) => {
       const chip = document.createElement("button");
@@ -144,25 +132,21 @@
     });
   }
 
-  // 4. Render Products Grid
   function renderProducts() {
     const productGrid = document.getElementById("product-grid");
     if (!productGrid) return;
     productGrid.innerHTML = "";
 
-    const filteredProducts =
-      activeCategory === "All"
-        ? allProducts
-        : allProducts.filter(
-            (p) => Array.isArray(p.categories) && p.categories.includes(activeCategory)
-          );
+    const filtered = activeCategory === "All"
+      ? allProducts
+      : allProducts.filter((p) => p.categories.includes(activeCategory));
 
-    if (filteredProducts.length === 0) {
+    if (filtered.length === 0) {
       productGrid.innerHTML = `<p style="text-align: center; color: #94a3b8; grid-column: 1/-1; padding: 40px 0;">No products found in this category.</p>`;
       return;
     }
 
-    filteredProducts.forEach((item) => {
+    filtered.forEach((item) => {
       const stockBadge =
         item.stock === "instock"
           ? `<span class="stock-tag stock-instock">In Stock</span>`
@@ -172,7 +156,25 @@
 
       const isDisabled = item.stock === "outofstock" ? "disabled" : "";
       const btnText = item.stock === "outofstock" ? "Out of Stock" : "+ Add to Cart";
-      const categoriesText = (item.categories || ["General"]).join(" • ");
+      const categoriesText = item.categories.join(" • ");
+
+      // Initial selected variant is the first option
+      const initialVariant = item.variants[0];
+
+      // Build size selector dropdown HTML
+      let sizeSelectorHtml = "";
+      if (item.variants.length > 1) {
+        sizeSelectorHtml = `
+          <div style="margin: 8px 0 12px 0;">
+            <label style="font-size: 11px; color: #64748b; display: block; margin-bottom: 2px;">Select Size:</label>
+            <select class="variant-select" data-prod-id="${item.id}" style="width: 100%; padding: 6px; font-size: 13px; border: 1px solid #cbd5e1; border-radius: 6px; background: white;">
+              ${item.variants.map((v, i) => `<option value="${i}">${v.size} - KSh ${v.price.toLocaleString()}</option>`).join("")}
+            </select>
+          </div>
+        `;
+      } else {
+        sizeSelectorHtml = `<div style="font-size: 12px; color: #64748b; margin: 4px 0 8px 0;">Size: <b>${initialVariant.size}</b></div>`;
+      }
 
       const card = document.createElement("div");
       card.className = "product-card";
@@ -183,9 +185,10 @@
             ${stockBadge}
             <div style="font-size: 11px; color: #64748b; margin: 4px 0 2px 0;">${categoriesText}</div>
             <div class="product-title">${item.name}</div>
-            <div class="product-price">KSh ${item.price.toLocaleString()}</div>
+            ${sizeSelectorHtml}
+            <div class="product-price" id="price-${item.id}">KSh ${initialVariant.price.toLocaleString()}</div>
           </div>
-          <button class="add-to-cart-btn" data-name="${encodeURIComponent(item.name)}" data-price="${item.price}" ${isDisabled}>
+          <button class="add-to-cart-btn" id="btn-${item.id}" data-prod-id="${item.id}" ${isDisabled}>
             ${btnText}
           </button>
         </div>
@@ -193,22 +196,50 @@
       productGrid.appendChild(card);
     });
 
+    // Handle variant dropdown selection change
+    document.querySelectorAll(".variant-select").forEach((select) => {
+      select.addEventListener("change", (e) => {
+        const prodId = e.target.getAttribute("data-prod-id");
+        const selectedIdx = Number(e.target.value);
+        const product = allProducts.find((p) => p.id === prodId);
+
+        if (product && product.variants[selectedIdx]) {
+          const selectedVariant = product.variants[selectedIdx];
+          const priceEl = document.getElementById(`price-${prodId}`);
+          if (priceEl) {
+            priceEl.innerText = `KSh ${selectedVariant.price.toLocaleString()}`;
+          }
+        }
+      });
+    });
+
+    // Add to Cart handler
     document.querySelectorAll(".add-to-cart-btn:not([disabled])").forEach((btn) => {
       btn.addEventListener("click", (e) => {
-        const name = decodeURIComponent(e.currentTarget.getAttribute("data-name"));
-        const price = Number(e.currentTarget.getAttribute("data-price"));
-        addToCart(name, price);
+        const prodId = e.currentTarget.getAttribute("data-prod-id");
+        const product = allProducts.find((p) => p.id === prodId);
+
+        if (!product) return;
+
+        let selectedVariant = product.variants[0];
+        const selectEl = document.querySelector(`.variant-select[data-prod-id="${prodId}"]`);
+        if (selectEl) {
+          selectedVariant = product.variants[Number(selectEl.value)];
+        }
+
+        addToCart(product.name, selectedVariant.size, selectedVariant.price);
       });
     });
   }
 
-  // 5. Cart Logic
-  function addToCart(name, price) {
-    const existingIndex = cart.findIndex((item) => item.name === name);
+  function addToCart(name, size, price) {
+    const cartKey = `${name} (${size})`;
+    const existingIndex = cart.findIndex((item) => item.cartKey === cartKey);
+
     if (existingIndex > -1) {
       cart[existingIndex].qty += 1;
     } else {
-      cart.push({ name, price, qty: 1 });
+      cart.push({ cartKey, name, size, price, qty: 1 });
     }
 
     updateCartUI();
@@ -245,7 +276,7 @@
         row.innerHTML = `
           <div>
             <div style="font-weight: 600; font-size: 14px; color: #0f172a;">${item.name}</div>
-            <div style="font-size: 12px; color: #64748b;">KSh ${item.price.toLocaleString()} x ${item.qty}</div>
+            <div style="font-size: 12px; color: #64748b;">Size: ${item.size} • KSh ${item.price.toLocaleString()} x ${item.qty}</div>
           </div>
           <div style="display: flex; align-items: center; gap: 8px;">
             <button class="qty-btn minus-btn" data-index="${index}" style="width: 26px; height: 26px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer;">-</button>
@@ -289,7 +320,6 @@
     }
   }
 
-  // 6. WhatsApp Checkout
   function checkoutToWhatsApp() {
     if (cart.length === 0) {
       alert("Your cart is empty!");
@@ -307,7 +337,7 @@
     cart.forEach((item, i) => {
       const itemTotal = item.price * item.qty;
       totalPrice += itemTotal;
-      message += `${i + 1}. *${item.name}*\n   Qty: ${item.qty} x KSh ${item.price.toLocaleString()} = KSh ${itemTotal.toLocaleString()}\n`;
+      message += `${i + 1}. *${item.name}* (${item.size})\n   Qty: ${item.qty} x KSh ${item.price.toLocaleString()} = KSh ${itemTotal.toLocaleString()}\n`;
     });
 
     message += `\n💰 *Total Amount:* KSh ${totalPrice.toLocaleString()}\n\nPlease confirm availability and payment details.`;
@@ -318,7 +348,6 @@
     window.open(waUrl, "_blank");
   }
 
-  // Bind Buttons Safely
   const cartToggleBtn = document.getElementById("cart-toggle-btn");
   const closeCartBtn = document.getElementById("close-cart-btn");
   const cartOverlay = document.getElementById("cart-overlay");
@@ -329,7 +358,6 @@
   if (cartOverlay) cartOverlay.addEventListener("click", () => toggleCartDrawer(false));
   if (whatsappCheckoutBtn) whatsappCheckoutBtn.addEventListener("click", checkoutToWhatsApp);
 
-  // Initialize App
   const storeId = getStoreIdFromUrl();
   if (storeId) {
     fetchStoreData(storeId);
@@ -340,7 +368,6 @@
       loadingState.innerHTML = `
         <div style="text-align: center; padding: 40px 20px; color: #64748b;">
           <p style="font-size: 16px; font-weight: 600;">No Store Specified in URL</p>
-          <p style="font-size: 13px; margin-top: 4px;">Please open the link directly from your dashboard (e.g. <code>index.html?store=aromatic-vibes</code>).</p>
         </div>
       `;
     }
