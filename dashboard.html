@@ -108,31 +108,35 @@
       <div style="background: #f8fafc; padding: 14px; border-radius: 8px; margin-bottom: 16px; border: 1px solid #f1f5f9;">
         <div class="form-group">
           <label>Product Name</label>
-          <input type="text" id="prod-name" placeholder="e.g. Lavender Eau de Parfum 50ml">
+          <input type="text" id="prod-name" placeholder="e.g. Hugo Boss Bottled">
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-          <div class="form-group">
-            <label>Price (KSh)</label>
-            <input type="number" id="prod-price" placeholder="3500">
+        <!-- Size Variants & Pricing Section -->
+        <div class="form-group" style="background: white; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; margin-bottom: 14px;">
+          <label style="color: #0f172a; margin-bottom: 8px;">Size Variants & Prices</label>
+          <div id="variants-container">
+            <!-- Dynamic Variant Rows render here (e.g., 30ml - KSh 3500, 50ml - KSh 5000) -->
           </div>
+          <button type="button" id="add-variant-btn" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; margin-top: 4px;">
+            + Add Another Size
+          </button>
+        </div>
 
-          <div class="form-group">
-            <label>Stock Status</label>
-            <select id="prod-stock">
-              <option value="instock">In Stock</option>
-              <option value="lowstock">Low Stock</option>
-              <option value="outofstock">Out of Stock</option>
-            </select>
-          </div>
+        <div class="form-group">
+          <label>Stock Status</label>
+          <select id="prod-stock">
+            <option value="instock">In Stock</option>
+            <option value="lowstock">Low Stock</option>
+            <option value="outofstock">Out of Stock</option>
+          </select>
         </div>
 
         <!-- Multi-Category Selector -->
         <div class="form-group">
-          <label>Categories (Select one or multiple)</label>
+          <label>Categories / Tags (Select one or multiple)</label>
           <div id="category-tags-list" class="cat-tags-container"></div>
           <div class="flex-gap">
-            <input type="text" id="prod-new-category-input" placeholder="Type new category name...">
+            <input type="text" id="prod-new-category-input" placeholder="Type new category (e.g. Men, Designer)...">
             <button type="button" id="add-category-tag-btn" class="btn btn-secondary" style="white-space: nowrap;">+ Add Tag</button>
           </div>
         </div>
