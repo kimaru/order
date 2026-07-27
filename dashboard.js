@@ -243,7 +243,7 @@
       addBtn.style.color = "#ffffff";
     }
 
-    showStatus(`Editing "${item.name}". Update the fields and click "Save Edits".`, "success");
+    showStatus(`Editing "${item.name}". Make changes above and click "Save Edits".`, "success");
   }
 
   function resetProductForm() {
@@ -285,28 +285,31 @@
 
     products.forEach((p, index) => {
       const sizesSummary = p.variants.map((v) => `${v.size}: KSh ${v.price.toLocaleString()}`).join(" • ");
+      
       const row = document.createElement("div");
       row.className = "product-row";
+      row.style.cssText = "display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; margin-bottom: 8px;";
+      
       row.innerHTML = `
-        <img src="${p.img}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=Product';">
-        <div>
-          <div style="font-weight: 600; font-size: 14px;">${p.name}</div>
+        <img src="${p.img}" alt="${p.name}" onerror="this.src='https://placehold.co/100x100?text=Product';" style="width: 48px; height: 48px; object-fit: cover; border-radius: 6px; background: #f1f5f9;">
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-weight: 600; font-size: 14px; color: #0f172a;">${p.name}</div>
           <div style="font-size: 11px; color: #64748b; margin-top: 2px;">Cats: ${p.categories.join(", ")}</div>
-          <div style="font-size: 11px; color: #0f172a; font-weight: 500; margin-top: 2px;">${sizesSummary}</div>
+          <div style="font-size: 11px; color: #059669; font-weight: 600; margin-top: 2px;">${sizesSummary}</div>
         </div>
         <div>
-          <span class="badge badge-${p.stock}">${p.stock}</span>
+          <span class="badge badge-${p.stock}" style="padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">${p.stock}</span>
         </div>
-        <div style="display: flex; gap: 6px;">
-          <button class="edit-btn" data-index="${index}" title="Edit Item" style="background: #e0f2fe; color: #0369a1; border: none; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px; font-weight: 600;">✏️ Edit</button>
-          <button class="del-btn" data-index="${index}" title="Remove Item" style="background: none; border: none; font-size: 16px; cursor: pointer; color: #ef4444;">🗑️</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <button type="button" class="edit-btn" data-index="${index}" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 600;">✏️ Edit</button>
+          <button type="button" class="del-btn" data-index="${index}" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 12px;">🗑️</button>
         </div>
       `;
       productListContainer.appendChild(row);
     });
 
     // Wire up Edit buttons
-    document.querySelectorAll(".edit-btn").forEach((btn) => {
+    productListContainer.querySelectorAll(".edit-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = Number(e.currentTarget.getAttribute("data-index"));
         startEditingProduct(idx);
@@ -314,7 +317,7 @@
     });
 
     // Wire up Delete buttons
-    document.querySelectorAll(".del-btn").forEach((btn) => {
+    productListContainer.querySelectorAll(".del-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = Number(e.currentTarget.getAttribute("data-index"));
         const removedName = products[idx]?.name || "Item";
