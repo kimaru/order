@@ -6,15 +6,13 @@
   let products = [];
   let availableCategories = ["Men", "Women", "Unisex", "Designer", "Niche"];
   let selectedCategories = [];
-  let editingIndex = null; // Track item being edited (null = adding new)
+  let editingIndex = null;
 
   let logoBase64 = "";
   let prodImageBase64 = "";
 
-  // Helper: Element safe getter
   const getEl = (id) => document.getElementById(id);
 
-  // Status Banner display
   function showStatus(msg, type = "success") {
     console.log(`[STATUS ${type.toUpperCase()}]:`, msg);
     const statusMsg = getEl("status-msg");
@@ -36,7 +34,6 @@
     setTimeout(() => { if (statusMsg) statusMsg.style.display = "none"; }, 6000);
   }
 
-  // Update Live Link
   function updateStoreLinkBanner(storeId) {
     const storeLinkBanner = getEl("store-link-banner");
     const storeUrlText = getEl("store-url-text");
@@ -52,7 +49,6 @@
     if (storeLinkBanner) storeLinkBanner.style.display = "flex";
   }
 
-  // MAIN FETCH FUNCTION
   function fetchFromCloud() {
     const storeIdInput = getEl("store-id-input");
     const storeId = (storeIdInput?.value || DEFAULT_STORE_ID).trim().toLowerCase();
@@ -78,27 +74,23 @@
 
         const fields = doc.fields;
 
-        // 1. Phone & Slogan
         const phoneEl = getEl("store-phone-input");
         const sloganEl = getEl("store-slogan-input");
         if (phoneEl) phoneEl.value = fields.phone?.stringValue || "";
         if (sloganEl) sloganEl.value = fields.slogan?.stringValue || "";
 
-        // 2. Theme Color
         const themeColor = fields.themeColor?.stringValue || "#10b981";
         const themeEl = getEl("store-theme-color");
         const hexEl = getEl("color-hex-label");
         if (themeEl) themeEl.value = themeColor;
         if (hexEl) hexEl.innerText = themeColor;
 
-        // 3. Logo
         logoBase64 = fields.logo?.stringValue || "";
         const logoImg = getEl("logo-preview-img");
         if (logoImg) {
           logoImg.src = logoBase64 || "https://placehold.co/100x100?text=Logo";
         }
 
-        // 4. Products Array Parsing
         const rawItems = fields.items?.arrayValue?.values || [];
 
         products = rawItems.map((item, index) => {
@@ -150,7 +142,6 @@
       });
   }
 
-  // --- VARIANT UI ---
   function renderVariantRows(variants = []) {
     const container = getEl("variants-container");
     if (!container) return;
@@ -185,7 +176,6 @@
     return variants;
   }
 
-  // --- CATEGORY UI ---
   function renderCategoryTags() {
     const list = getEl("category-tags-list");
     if (!list) return;
@@ -217,14 +207,12 @@
     });
   }
 
-  // --- EDIT PRODUCT LOGIC ---
   function startEditingProduct(index) {
     const item = products[index];
     if (!item) return;
 
     editingIndex = index;
 
-    // Fill form fields
     if (getEl("prod-name")) getEl("prod-name").value = item.name;
     if (getEl("prod-stock")) getEl("prod-stock").value = item.stock;
 
@@ -235,7 +223,6 @@
     renderCategoryTags();
     renderVariantRows(item.variants);
 
-    // Update Button UI
     const addBtn = getEl("add-prod-btn");
     if (addBtn) {
       addBtn.innerText = "💾 Save Edits to Product";
@@ -269,7 +256,6 @@
     }
   }
 
-  // --- CATALOG LIST UI ---
   function renderProductList() {
     const productListContainer = getEl("product-list-container");
     const prodCountLabel = getEl("prod-count");
@@ -308,7 +294,6 @@
       productListContainer.appendChild(row);
     });
 
-    // Wire up Edit buttons
     productListContainer.querySelectorAll(".edit-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = Number(e.currentTarget.getAttribute("data-index"));
@@ -316,7 +301,6 @@
       });
     });
 
-    // Wire up Delete buttons
     productListContainer.querySelectorAll(".del-btn").forEach((btn) => {
       btn.addEventListener("click", (e) => {
         const idx = Number(e.currentTarget.getAttribute("data-index"));
@@ -329,7 +313,6 @@
     });
   }
 
-  // --- PUBLISH TO CLOUD ---
   function syncToCloud() {
     const storeIdInput = getEl("store-id-input");
     const storeId = (storeIdInput?.value || DEFAULT_STORE_ID).trim().toLowerCase();
@@ -349,11 +332,13 @@
         }
       }));
 
+      const primaryPrice = Number(p.variants[0]?.price || 0);
+
       return {
         mapValue: {
           fields: {
             name: { stringValue: p.name },
-            price: { doubleValue: Number(p.variants[0]?.price || 0) },
+            price: { doubleValue: primaryPrice }, // Top level fallback price
             stock: { stringValue: p.stock },
             img: { stringValue: p.img },
             categories: { arrayValue: { values: catValues } },
@@ -391,14 +376,12 @@
       });
   }
 
-  // --- INITIALIZATION ---
   window.addEventListener("DOMContentLoaded", () => {
     const storeIdInput = getEl("store-id-input");
     if (storeIdInput && !storeIdInput.value) {
       storeIdInput.value = DEFAULT_STORE_ID;
     }
 
-    // File input preview listeners
     const logoFileInput = getEl("store-logo-file");
     if (logoFileInput) {
       logoFileInput.addEventListener("change", (e) => {
@@ -488,11 +471,9 @@
         };
 
         if (editingIndex !== null) {
-          // Updating existing product
           products[editingIndex] = productData;
           showStatus(`Updated "${name}".`);
         } else {
-          // Adding new product
           products.push(productData);
           showStatus(`Added "${name}" to list.`);
         }
@@ -506,7 +487,6 @@
     renderCategoryTags();
     renderProductList();
 
-    // Auto-fetch on load
     fetchFromCloud();
   });
 })();
