@@ -17,9 +17,6 @@
 
   const prodNameInput = document.getElementById("prod-name");
   const prodPriceInput = document.getElementById("prod-price");
-  const prodCategorySelect = document.getElementById("prod-category-select");
-  const prodCustomCategoryInput = document.getElementById("prod-custom-category");
-  const removeCatBtn = document.getElementById("remove-cat-btn");
   const prodStockSelect = document.getElementById("prod-stock");
   const prodImgFileInput = document.getElementById("prod-img-file");
   const prodPreviewImg = document.getElementById("prod-preview-img");
@@ -27,94 +24,102 @@
   const productListContainer = document.getElementById("product-list-container");
   const prodCount = document.getElementById("prod-count");
 
+  // Multi-Category Elements
+  const categoryTagsList = document.getElementById("category-tags-list");
+  const prodNewCategoryInput = document.getElementById("prod-new-category-input");
+  const addCategoryTagBtn = document.getElementById("add-category-tag-btn");
+
   const copyLinkBtn = document.getElementById("copy-link-btn");
 
   let localItems = [];
   let availableCategories = new Set(["General"]);
+  let activeSelectedCategories = new Set(["General"]);
   let currentLogoBase64 = "";
   let currentProdImgBase64 = "";
   let currentGeneratedUrl = "";
   let editingIndex = -1;
 
-  // Handle Category Select Toggle
-  if (prodCategorySelect) {
-    prodCategorySelect.addEventListener("change", (e) => {
-      const selected = e.target.value;
+  // Render Interactive Category Tags
+  function renderCategoryTagSelector() {
+    if (!categoryTagsList) return;
+    categoryTagsList.innerHTML = "";
+
+    availableCategories.forEach((cat) => {
+      const tag = document.createElement("span");
+      const isSelected = activeSelectedCategories.has(cat);
+      tag.className = `cat-tag ${isSelected ? 'selected' : ''}`;
       
-      if (selected === "__ADD_NEW__") {
-        prodCustomCategoryInput.style.display = "block";
-        prodCustomCategoryInput.focus();
-        if (removeCatBtn) removeCatBtn.style.display = "none";
-      } else {
-        prodCustomCategoryInput.style.display = "none";
-        prodCustomCategoryInput.value = "";
-        // Show trash icon for custom categories (hide for General or Add New)
-        if (removeCatBtn) {
-          removeCatBtn.style.display = (selected && selected !== "General") ? "inline-block" : "none";
+      let html = `<span>${cat}</span>`;
+      if (cat !== "General") {
+        html += `<span class="remove-cat-x" title="Delete category store-wide">×</span>`;
+      }
+      tag.innerHTML = html;
+
+      // Toggle Selection on Tag Click
+      tag.addEventListener("click", (e) => {
+        if (e.target.classList.contains("remove-cat-x")) {
+          e.stopPropagation();
+          deleteCategoryGlobal(cat);
+          return;
         }
-      }
-    });
-  }
 
-  // Remove Category Action
-  if (removeCatBtn) {
-    removeCatBtn.addEventListener("click", () => {
-      const targetCat = prodCategorySelect.value;
-      if (!targetCat || targetCat === "General" || targetCat === "__ADD_NEW__") return;
-
-      if (confirm(`Remove category "${targetCat}"? All items in this category will move to "General".`)) {
-        // Move assigned items to General
-        localItems.forEach(item => {
-          if (item.category === targetCat) {
-            item.category = "General";
+        if (activeSelectedCategories.has(cat)) {
+          if (activeSelectedCategories.size > 1) {
+            activeSelectedCategories.delete(cat);
           }
-        });
+        } else {
+          activeSelectedCategories.add(cat);
+        }
+        renderCategoryTagSelector();
+      });
 
-        availableCategories.delete(targetCat);
-        renderProducts();
-        refreshCategoryDropdown("General");
-        showStatus(`Category "${targetCat}" deleted. Items moved to "General".`);
-      }
+      categoryTagsList.appendChild(tag);
     });
   }
 
-  // Populate Dropdown Options
-  function refreshCategoryDropdown(selectedCategory = "General") {
-    if (!prodCategorySelect) return;
+  // Delete Category Store-wide
+  function deleteCategoryGlobal(catToDelete) {
+    if (confirm(`Delete category "${catToDelete}"? It will be removed from all products.`)) {
+      localItems.forEach((item) => {
+        if (Array.isArray(item.categories)) {
+          item.categories = item.categories.filter((c) => c !== catToDelete);
+          if (item.categories.length === 0) item.categories = ["General"];
+        }
+      });
 
-    // Recalculate categories from active items
+      availableCategories.delete(catToDelete);
+      activeSelectedCategories.delete(catToDelete);
+      if (activeSelectedCategories.size === 0) activeSelectedCategories.add("General");
+
+      renderProducts();
+      refreshAvailableCategories();
+      showStatus(`Deleted category "${catToDelete}".`);
+    }
+  }
+
+  // Add New Custom Category Tag
+  if (addCategoryTagBtn) {
+    addCategoryTagBtn.addEventListener("click", () => {
+      const newCat = prodNewCategoryInput.value.trim();
+      if (!newCat) return;
+
+      availableCategories.add(newCat);
+      activeSelectedCategories.add(newCat);
+      prodNewCategoryInput.value = "";
+      renderCategoryTagSelector();
+    });
+  }
+
+  function refreshAvailableCategories() {
     availableCategories = new Set(["General"]);
-    localItems.forEach(item => {
-      if (item.category) availableCategories.add(item.category);
+    localItems.forEach((item) => {
+      if (Array.isArray(item.categories)) {
+        item.categories.forEach((c) => availableCategories.add(c));
+      } else if (item.category) {
+        availableCategories.add(item.category);
+      }
     });
-
-    prodCategorySelect.innerHTML = "";
-
-    availableCategories.forEach(cat => {
-      const opt = document.createElement("option");
-      opt.value = cat;
-      opt.innerText = cat;
-      prodCategorySelect.appendChild(opt);
-    });
-
-    const addNewOpt = document.createElement("option");
-    addNewOpt.value = "__ADD_NEW__";
-    addNewOpt.innerText = "➕ Add another category...";
-    prodCategorySelect.appendChild(addNewOpt);
-
-    if (availableCategories.has(selectedCategory)) {
-      prodCategorySelect.value = selectedCategory;
-      prodCustomCategoryInput.style.display = "none";
-    } else if (selectedCategory && selectedCategory !== "General") {
-      availableCategories.add(selectedCategory);
-      refreshCategoryDropdown(selectedCategory);
-      return;
-    }
-
-    // Toggle trash icon visibility
-    if (removeCatBtn) {
-      removeCatBtn.style.display = (prodCategorySelect.value !== "General" && prodCategorySelect.value !== "__ADD_NEW__") ? "inline-block" : "none";
-    }
+    renderCategoryTagSelector();
   }
 
   function updateStoreLinkBanner(storeId) {
@@ -216,7 +221,7 @@
     setTimeout(() => { statusMsg.style.display = "none"; }, 5000);
   }
 
-  // Fetch Store Data from Cloud
+  // Fetch Store Data
   function fetchFromCloud() {
     const storeId = storeIdInput.value.trim().toLowerCase();
     if (!storeId) {
@@ -247,10 +252,20 @@
         const rawItems = doc.fields.items?.arrayValue?.values || [];
         localItems = rawItems.map((item) => {
           const fields = item.mapValue?.fields || {};
+          
+          // Parse categories array or single fallback category
+          let cats = [];
+          if (fields.categories?.arrayValue?.values) {
+            cats = fields.categories.arrayValue.values.map(v => v.stringValue);
+          } else if (fields.category?.stringValue) {
+            cats = [fields.category.stringValue];
+          }
+          if (cats.length === 0) cats = ["General"];
+
           return {
             name: fields.name?.stringValue || "",
             price: Number(fields.price?.doubleValue || fields.price?.integerValue || 0),
-            category: fields.category?.stringValue || "General",
+            categories: cats,
             stock: fields.stock?.stringValue || "instock",
             img: fields.img?.stringValue || "",
           };
@@ -258,7 +273,7 @@
 
         resetProductForm();
         renderProducts();
-        refreshCategoryDropdown();
+        refreshAvailableCategories();
         updateStoreLinkBanner(storeId);
         showStatus(`Loaded store "${storeId}" with ${localItems.length} products!`);
       })
@@ -287,13 +302,15 @@
         ? `<span class="badge badge-lowstock">Low Stock</span>`
         : `<span class="badge badge-outofstock">Out of Stock</span>`;
 
+      const catsListText = (item.categories || ["General"]).join(", ");
+
       const row = document.createElement("div");
       row.className = "product-row";
       row.innerHTML = `
         <img src="${item.img || 'https://placehold.co/100x100?text=No+Img'}" onerror="this.src='https://placehold.co/100x100?text=No+Img';">
         <div>
           <strong style="font-size: 14px; color: #0f172a;">${item.name}</strong>
-          <div style="font-size: 12px; color: #64748b;">🏷️ ${item.category || 'General'} | ${stockBadge}</div>
+          <div style="font-size: 12px; color: #64748b;">🏷️ ${catsListText} | ${stockBadge}</div>
         </div>
         <div style="font-weight: 600; font-size: 14px; color: #0f172a;">KSh ${item.price.toLocaleString()}</div>
         <div style="display: flex; gap: 6px; justify-content: flex-end;">
@@ -310,7 +327,7 @@
         localItems.splice(idx, 1);
         if (editingIndex == idx) resetProductForm();
         renderProducts();
-        refreshCategoryDropdown();
+        refreshAvailableCategories();
       });
     });
 
@@ -331,7 +348,8 @@
     prodStockSelect.value = item.stock || "instock";
     currentProdImgBase64 = item.img || "";
 
-    refreshCategoryDropdown(item.category || "General");
+    activeSelectedCategories = new Set(item.categories || ["General"]);
+    renderCategoryTagSelector();
 
     if (prodPreviewImg) {
       prodPreviewImg.src = item.img || "https://placehold.co/100x100?text=Product";
@@ -348,14 +366,13 @@
     editingIndex = -1;
     prodNameInput.value = "";
     prodPriceInput.value = "";
-    prodCustomCategoryInput.value = "";
-    prodCustomCategoryInput.style.display = "none";
     prodStockSelect.value = "instock";
     if (prodImgFileInput) prodImgFileInput.value = "";
     currentProdImgBase64 = "";
     if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
 
-    refreshCategoryDropdown();
+    activeSelectedCategories = new Set(["General"]);
+    refreshAvailableCategories();
 
     addProdBtn.innerText = "+ Add Product to List";
     addProdBtn.style.background = "#f1f5f9";
@@ -370,12 +387,7 @@
       const name = prodNameInput.value.trim();
       const price = Number(prodPriceInput.value);
       const stock = prodStockSelect.value;
-
-      let category = prodCategorySelect.value;
-      if (category === "__ADD_NEW__") {
-        category = prodCustomCategoryInput.value.trim();
-      }
-      if (!category) category = "General";
+      const categories = Array.from(activeSelectedCategories);
 
       if (!name || isNaN(price) || price <= 0) {
         showStatus("Please enter a valid product name and price.", true);
@@ -385,15 +397,14 @@
       const finalImg = currentProdImgBase64 || "https://placehold.co/200x200?text=No+Photo";
 
       if (editingIndex >= 0) {
-        localItems[editingIndex] = { name, price, category, stock, img: finalImg };
+        localItems[editingIndex] = { name, price, categories, stock, img: finalImg };
         showStatus(`Updated "${name}". Click "Publish All Changes" to sync online.`);
       } else {
-        localItems.push({ name, price, category, stock, img: finalImg });
+        localItems.push({ name, price, categories, stock, img: finalImg });
         showStatus(`Added "${name}" to list. Click "Publish All Changes" to sync online.`);
       }
 
       renderProducts();
-      refreshCategoryDropdown(category);
       resetProductForm();
     });
   }
@@ -417,7 +428,11 @@
         fields: {
           name: { stringValue: item.name || "" },
           price: { doubleValue: Number(item.price) || 0 },
-          category: { stringValue: item.category || "General" },
+          categories: { 
+            arrayValue: { 
+              values: (item.categories || ["General"]).map(c => ({ stringValue: c })) 
+            } 
+          },
           stock: { stringValue: item.stock || "instock" },
           img: { stringValue: item.img || "" },
         },
