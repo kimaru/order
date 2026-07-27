@@ -31,6 +31,11 @@
   let logoBase64 = "";
   let prodImageBase64 = "";
 
+  // Pre-fill default store ID
+  if (storeIdInput && !storeIdInput.value) {
+    storeIdInput.value = "perfumescentre";
+  }
+
   // Show status banner
   function showStatus(msg, type = "success") {
     if (!statusMsg) return;
@@ -45,7 +50,7 @@
       statusMsg.style.color = "#991b1b";
       statusMsg.style.borderColor = "#fecaca";
     }
-    setTimeout(() => { statusMsg.style.display = "none"; }, 5000);
+    setTimeout(() => { statusMsg.style.display = "none"; }, 6000);
   }
 
   // Update live store link UI
@@ -224,36 +229,52 @@
   function fetchFromCloud() {
     const storeId = storeIdInput?.value.trim().toLowerCase();
     if (!storeId) {
-      showStatus("Please enter a Store ID to fetch data.", "error");
+      showStatus("Please enter a Store ID (e.g., perfumescentre) to fetch.", "error");
       return;
     }
+
+    showStatus(`Fetching data for "${storeId}"...`, "success");
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) throw new Error(`Store "${storeId}" not found in Cloud.`);
+        if (res.status === 404) {
+          throw new Error(`Store "${storeId}" was not found in Cloud. If this is a new store ID, fill in the details below and click 'Publish All Changes' to create it!`);
+        }
+        if (!res.ok) {
+          throw new Error(`Cloud Error (HTTP ${res.status}). Could not fetch store data.`);
+        }
         return res.json();
       })
       .then((doc) => {
-        if (!doc.fields) throw new Error("Store exists but contains no fields.");
+        if (!doc.fields) {
+          throw new Error(`Store "${storeId}" exists but contains no saved fields.`);
+        }
 
         const fields = doc.fields;
+
+        // Phone & Slogan
         if (storePhoneInput) storePhoneInput.value = fields.phone?.stringValue || "";
         if (storeSloganInput) storeSloganInput.value = fields.slogan?.stringValue || "";
         
+        // Theme
         const themeColor = fields.themeColor?.stringValue || "#10b981";
         if (storeThemeColor) storeThemeColor.value = themeColor;
         if (colorHexLabel) colorHexLabel.innerText = themeColor;
 
+        // Logo
         logoBase64 = fields.logo?.stringValue || "";
-        if (logoPreviewImg && logoBase64) logoPreviewImg.src = logoBase64;
+        if (logoPreviewImg) {
+          logoPreviewImg.src = logoBase64 || "https://placehold.co/100x100?text=Logo";
+        }
 
+        // Products
         const rawItems = fields.items?.arrayValue?.values || [];
         products = rawItems.map((item) => {
           const f = item.mapValue?.fields || {};
 
-          // Extract Categories
+          // Categories
           let cats = [];
           if (f.categories?.arrayValue?.values) {
             cats = f.categories.arrayValue.values.map((v) => v.stringValue).filter(Boolean);
@@ -261,12 +282,11 @@
             cats = [f.category.stringValue];
           }
 
-          // Merge into global category list
           cats.forEach((c) => {
             if (!availableCategories.includes(c)) availableCategories.push(c);
           });
 
-          // Extract Variants
+          // Variants
           let variantsList = [];
           if (f.variants?.arrayValue?.values) {
             variantsList = f.variants.arrayValue.values.map((v) => {
@@ -284,7 +304,7 @@
           }
 
           return {
-            name: f.name?.stringValue || "Unnamed",
+            name: f.name?.stringValue || "Unnamed Product",
             categories: cats.length ? cats : ["General"],
             variants: variantsList,
             stock: f.stock?.stringValue || "instock",
@@ -295,9 +315,10 @@
         renderCategoryTags();
         renderProductList();
         updateStoreLinkBanner(storeId);
-        showStatus(`Successfully loaded data for store "${storeId}"!`);
+        showStatus(`🎉 Successfully loaded all data for store "${storeId}"!`);
       })
       .catch((err) => {
+        console.error("Fetch Cloud Error:", err);
         showStatus(err.message, "error");
       });
   }
@@ -312,7 +333,7 @@
         return;
       }
       updateStoreLinkBanner(storeId);
-      showStatus("Store settings updated locally. Click 'Publish All Changes' below to save to cloud.");
+      showStatus("Store settings saved locally. Click 'Publish All Changes' below to save to cloud.");
     });
   }
 
@@ -330,7 +351,7 @@
       }
 
       if (variants.length === 0) {
-        showStatus("Please enter at least one size variant with a valid price.", "error");
+        showStatus("Please enter at least one size variant with a price.", "error");
         return;
       }
 
@@ -344,7 +365,7 @@
 
       products.push(newProduct);
 
-      // Reset Form
+      // Reset
       if (prodNameInput) prodNameInput.value = "";
       prodImageBase64 = "";
       if (prodPreviewImg) prodPreviewImg.src = "https://placehold.co/100x100?text=Product";
@@ -353,7 +374,7 @@
       renderVariantRows();
       renderProductList();
 
-      showStatus(`Added "${name}" to product list.`);
+      showStatus(`Added "${name}" to your local catalog list.`);
     });
   }
 
@@ -409,6 +430,8 @@
       return;
     }
 
+    showStatus(`Publishing changes for "${storeId}"...`, "success");
+
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     const itemsPayload = products.map((p) => {
@@ -452,19 +475,20 @@
       body: JSON.stringify(payload)
     })
       .then((res) => {
-        if (!res.ok) throw new Error(`Sync failed with status code ${res.status}`);
+        if (!res.ok) throw new Error(`Publish failed with status code ${res.status}`);
         return res.json();
       })
       .then(() => {
         updateStoreLinkBanner(storeId);
-        showStatus(`🎉 Successfully published all changes to storefront "${storeId}"!`);
+        showStatus(`🚀 Successfully published store "${storeId}" to the cloud!`);
       })
       .catch((err) => {
+        console.error("Publish Error:", err);
         showStatus(`Failed to publish: ${err.message}`, "error");
       });
   }
 
-  // Initial Load Setup
+  // Initial Setup
   renderVariantRows();
   renderCategoryTags();
   renderProductList();
