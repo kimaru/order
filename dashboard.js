@@ -66,7 +66,7 @@
     };
   }
 
-  // Robust URL Builder for all routing environments
+  // Bulletproof URL Builder using Web Standard URL constructor
   function updateStoreLinkBanner(storeId) {
     const storeLinkBanner = getEl("store-link-banner");
     const storeUrlText = getEl("store-url-text");
@@ -77,23 +77,14 @@
       return;
     }
 
-    const origin = window.location.origin;
-    let path = window.location.pathname;
-
-    if (path.endsWith("dashboard.html")) {
-      path = path.substring(0, path.length - "dashboard.html".length);
-    }
-
-    if (!path.endsWith("/")) {
-      path += "/";
-    }
-
-    const storeUrl = `${origin}${path}index.html?store=${storeId}`;
+    // Resolves relative index.html accurately from current folder/URL path
+    const storeUrl = new URL(`index.html?store=${encodeURIComponent(storeId)}`, window.location.href).href;
 
     if (storeUrlText) storeUrlText.innerText = storeUrl;
     if (visitStoreBtn) {
       visitStoreBtn.href = storeUrl;
       visitStoreBtn.target = "_blank";
+      visitStoreBtn.rel = "noopener noreferrer";
     }
     if (storeLinkBanner) storeLinkBanner.style.display = "flex";
   }
