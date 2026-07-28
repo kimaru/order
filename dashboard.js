@@ -1,8 +1,3 @@
-// ==========================================
-// AUDITED DASHBOARD CONTROLLER (REST + FULL SCHEMA)
-// Project ID: whatsapp-eco-engine-80882
-// ==========================================
-
 const PROJECT_ID = "whatsapp-eco-engine-80882";
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
@@ -18,27 +13,21 @@ let storeConfig = {
 
 function getEl(id) { return document.getElementById(id); }
 
-// Navigation Link Banner Fix
 function updateStoreLinkBanner(storeId) {
   const banner = getEl("store-link-banner");
   const urlText = getEl("store-url-text");
   const btn = getEl("visit-store-btn");
-
   if (!storeId || !banner) return;
 
   const storeRelativePath = `index.html?store=${encodeURIComponent(storeId)}`;
   const fullUrl = `${window.location.origin}${window.location.pathname.replace(/dashboard\.html$/i, "")}${storeRelativePath}`;
 
   if (urlText) urlText.innerText = fullUrl;
-  if (btn) {
-    btn.href = storeRelativePath;
-    btn.target = "_blank";
-    btn.rel = "noopener noreferrer";
-  }
+  if (btn) { btn.href = storeRelativePath; btn.target = "_blank"; }
   banner.style.display = "flex";
 }
 
-// Canvas Image Compression Helper (Fits within Firestore REST Limits)
+// Canvas Compression: Max 600px width/height, 0.6 JPEG quality
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -63,7 +52,6 @@ function compressImage(file) {
   });
 }
 
-// Firestore Schema Converters
 function toFirestore(val) {
   if (val === null || val === undefined) return { nullValue: null };
   if (typeof val === "boolean") return { booleanValue: val };
@@ -125,20 +113,26 @@ async function fetchFromCloud(storeId) {
   }
 }
 
-// UI Renderers
 function renderCategories() {
   const catList = getEl("category-list");
-  const catSelect = getEl("product-category-select");
+  const catBoxes = getEl("product-category-checkboxes");
 
   if (catList) {
     catList.innerHTML = (storeConfig.categories || [])
       .map((c, i) => `<li>${c} <button class="btn btn-danger btn-sm" onclick="deleteCategory(${i})">✕</button></li>`)
       .join("");
   }
-  if (catSelect) {
-    catSelect.innerHTML = `<option value="">-- Select Category --</option>` + (storeConfig.categories || [])
-      .map((c) => `<option value="${c}">${c}</option>`)
-      .join("");
+  if (catBoxes) {
+    if ((storeConfig.categories || []).length === 0) {
+      catBoxes.innerHTML = `<span style="color:#6c757d; font-size:12px;">Add categories above first.</span>`;
+    } else {
+      catBoxes.innerHTML = (storeConfig.categories || [])
+        .map(c => `
+          <label class="checkbox-label">
+            <input type="checkbox" class="prod-cat-checkbox" value="${c}"> ${c}
+          </label>
+        `).join("");
+    }
   }
 }
 
@@ -148,6 +142,7 @@ function renderProducts() {
 
   tbody.innerHTML = (storeConfig.products || [])
     .map((p, i) => {
+      const cats = Array.isArray(p.categories) ? p.categories.join(", ") : (p.category || '-');
       const variantStr = (p.variants || [])
         .map(v => `${v.size}: KSh ${v.price}`)
         .join(", ") || "No variants";
@@ -156,7 +151,7 @@ function renderProducts() {
         <tr>
           <td><img src="${p.image || ''}" width="40" height="40" style="object-fit:cover; border-radius:4px;" /></td>
           <td><strong>${p.name}</strong></td>
-          <td>${p.category || '-'}</td>
+          <td>${cats}</td>
           <td>${variantStr}</td>
           <td><span style="color:${p.inStock ? 'green' : 'red'}; font-weight:bold;">${p.inStock ? 'In Stock' : 'Out of Stock'}</span></td>
           <td><button class="btn btn-danger btn-sm" onclick="deleteProduct(${i})">Delete</button></td>
@@ -165,7 +160,6 @@ function renderProducts() {
     }).join("");
 }
 
-// Exposed Window Functions for HTML Event Attributes
 window.addCategory = function() {
   const input = getEl("new-category-input");
   if (input && input.value.trim()) {
@@ -196,11 +190,15 @@ window.addVariantRow = function() {
 
 window.addProduct = async function() {
   const name = getEl("prod-name").value.trim();
-  const category = getEl("product-category-select").value;
   const inStock = getEl("prod-stock").value === "true";
   const fileInput = getEl("prod-image");
 
+  // Collect Multiple Selected Categories
+  const checkedBoxes = document.querySelectorAll(".prod-cat-checkbox:checked");
+  const categories = Array.from(checkedBoxes).map(cb => cb.value);
+
   if (!name) return alert("Product name is required.");
+  if (categories.length === 0) return alert("Please select at least one category.");
 
   // Parse Variants
   const sizeInputs = document.querySelectorAll(".variant-size");
@@ -210,9 +208,7 @@ window.addProduct = async function() {
   sizeInputs.forEach((sInput, idx) => {
     const size = sInput.value.trim();
     const price = parseFloat(priceInputs[idx].value) || 0;
-    if (size && price > 0) {
-      variants.push({ size, price });
-    }
+    if (size && price > 0) variants.push({ size, price });
   });
 
   let image = "";
@@ -221,11 +217,12 @@ window.addProduct = async function() {
   }
 
   storeConfig.products = storeConfig.products || [];
-  storeConfig.products.push({ name, category, variants, inStock, image });
+  storeConfig.products.push({ name, categories, variants, inStock, image });
   
-  // Clear Input Form
+  // Clear Form
   getEl("prod-name").value = "";
   fileInput.value = "";
+  document.querySelectorAll(".prod-cat-checkbox").forEach(cb => cb.checked = false);
   getEl("variants-container").innerHTML = `
     <div class="variant-row">
       <input type="text" placeholder="Size (e.g. 100ml)" class="variant-size" style="flex:1;">
@@ -250,7 +247,6 @@ window.saveStoreConfig = function() {
   syncToCloud();
 };
 
-// DOM Initialization
 document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
   currentStoreId = params.get("store") || "perfumescentre";
