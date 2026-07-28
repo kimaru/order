@@ -2,11 +2,11 @@
   const PROJECT_ID = "whatsapp-eco-engine-80882";
   const DEFAULT_STORE_ID = "perfumescentre";
 
-  const COMMON_SIZES = ["Standard", "30ml", "50ml", "100ml", "125ml", "200ml", "Small (S)", "Medium (M)", "Large (L)", "XL", "2XL", "Custom..."];
-
-  let products = [];
+  // State Management
+  let storeSizes = ["30ml", "50ml", "100ml", "125ml", "200ml"]; // Merchant defined size catalog
   let availableCategories = ["General", "Men", "Women", "Unisex"];
   let selectedCategories = [];
+  let products = [];
   let editingIndex = null;
 
   let logoBase64 = "";
@@ -17,10 +17,7 @@
   function showStatus(msg, type = "success") {
     console.log(`[STATUS ${type.toUpperCase()}]:`, msg);
     const statusMsg = getEl("status-msg");
-    if (!statusMsg) {
-      alert(`${type.toUpperCase()}: ${msg}`);
-      return;
-    }
+    if (!statusMsg) return;
     statusMsg.style.display = "block";
     statusMsg.innerText = msg;
     if (type === "success") {
@@ -61,13 +58,13 @@
     fetch(firestoreUrl)
       .then((res) => {
         if (res.status === 404) {
-          throw new Error(`Store "${storeId}" not published yet. Add items and click "Publish All Changes".`);
+          throw new Error(`Store "${storeId}" not published yet. Click "Publish All Changes" to create it.`);
         }
-        if (!res.ok) throw new Error(`HTTP Error ${res.status} while fetching data.`);
+        if (!res.ok) throw new Error(`HTTP Error ${res.status} while fetching store data.`);
         return res.json();
       })
       .then((doc) => {
-        if (!doc || !doc.fields) throw new Error(`Document for "${storeId}" is empty.`);
+        if (!doc || !doc.fields) throw new Error(`Store document for "${storeId}" contains no fields.`);
 
         const fields = doc.fields;
 
@@ -84,8 +81,12 @@
 
         logoBase64 = fields.logo?.stringValue || "";
         const logoImg = getEl("logo-preview-img");
-        if (logoImg) {
-          logoImg.src = logoBase64 || "https://placehold.co/100x100?text=Logo";
+        if (logoImg) logoImg.src = logoBase64 || "https://placehold.co/100x100?text=Logo";
+
+        // Read store-wide size definitions
+        if (fields.storeSizes?.arrayValue?.values) {
+          const loadedSizes = fields.storeSizes.arrayValue.values.map(v => v.stringValue).filter(Boolean);
+          if (loadedSizes.length > 0) storeSizes = loadedSizes;
         }
 
         const rawItems = fields.items?.arrayValue?.values || [];
@@ -108,8 +109,10 @@
           if (f.variants?.arrayValue?.values) {
             variantsList = f.variants.arrayValue.values.map((v) => {
               const vf = v.mapValue?.fields || {};
+              const s = vf.size?.stringValue || "Standard";
+              if (!storeSizes.includes(s)) storeSizes.push(s);
               return {
-                size: vf.size?.stringValue || "Standard",
+                size: s,
                 price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
               };
             });
@@ -117,7 +120,7 @@
 
           const fallbackPrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
           if (variantsList.length === 0) {
-            variantsList = [{ size: "Standard", price: fallbackPrice }];
+            variantsList = [{ size: storeSizes[0] || "Standard", price: fallbackPrice }];
           }
 
           return {
@@ -129,24 +132,52 @@
           };
         });
 
+        renderStoreSizeTags();
         renderCategoryTags();
         renderProductList();
+        renderVariantRows();
         updateStoreLinkBanner(storeId);
-        showStatus(`🎉 Loaded store data for "${storeId}" (${products.length} products found)!`);
+        showStatus(`🎉 Loaded store data for "${storeId}" (${products.length} products loaded)!`);
       })
       .catch((err) => {
         showStatus(err.message, "error");
       });
   }
 
-  // --- HYBRID VARIANT ROW (Dropdown + Custom Text Input) ---
+  // --- RENDER STORE-WIDE SIZES TAGS ---
+  function renderStoreSizeTags() {
+    const container = getEl("store-sizes-tags-list");
+    if (!container) return;
+    container.innerHTML = "";
+
+    storeSizes.forEach((sz) => {
+      const tag = document.createElement("span");
+      tag.className = "cat-tag";
+      tag.style.background = "#e0f2fe";
+      tag.style.color = "#0369a1";
+      tag.style.borderColor = "#bae6fd";
+      tag.innerHTML = `${sz} <span class="remove-cat-x" data-size="${sz}">✕</span>`;
+
+      tag.querySelector(".remove-cat-x").addEventListener("click", (e) => {
+        e.stopPropagation();
+        const targetSize = e.target.getAttribute("data-size");
+        storeSizes = storeSizes.filter(s => s !== targetSize);
+        renderStoreSizeTags();
+        renderVariantRows();
+      });
+
+      container.appendChild(tag);
+    });
+  }
+
+  // --- RENDER DYNAMIC VARIANT DROPDOWNS ---
   function renderVariantRows(variants = []) {
     const container = getEl("variants-container");
     if (!container) return;
     container.innerHTML = "";
 
     if (variants.length === 0) {
-      variants = [{ size: "Standard", price: "" }];
+      variants = [{ size: storeSizes[0] || "Standard", price: "" }];
     }
 
     variants.forEach((v) => {
@@ -154,40 +185,31 @@
     });
   }
 
-  function createVariantRowElement(container, initialSize = "Standard", initialPrice = "") {
+  function createVariantRowElement(container, selectedSize = "", initialPrice = "") {
     const row = document.createElement("div");
     row.className = "variant-row";
     row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
 
-    const isPreset = COMMON_SIZES.includes(initialSize);
-    const selectedPreset = isPreset ? initialSize : "Custom...";
-    const customValue = isPreset ? "" : initialSize;
+    // If selectedSize isn't in storeSizes, auto append
+    if (selectedSize && !storeSizes.includes(selectedSize)) {
+      storeSizes.push(selectedSize);
+      renderStoreSizeTags();
+    }
 
-    let optionsHTML = COMMON_SIZES.map(s => `<option value="${s}" ${s === selectedPreset ? "selected" : ""}>${s}</option>`).join("");
+    let optionsHTML = storeSizes.map((s) => {
+      const isSel = (s === selectedSize) ? "selected" : "";
+      return `<option value="${s}" ${isSel}>${s}</option>`;
+    }).join("");
 
     row.innerHTML = `
-      <select class="variant-preset-select" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
+      <select class="variant-size-select" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
         ${optionsHTML}
       </select>
-      <input type="text" class="variant-custom-size" placeholder="Type custom size/option..." value="${customValue}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; display: ${selectedPreset === "Custom..." ? "block" : "none"};">
       <input type="number" class="variant-price" placeholder="Price (KSh)" value="${initialPrice || ""}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
       <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
     `;
 
     container.appendChild(row);
-
-    const select = row.querySelector(".variant-preset-select");
-    const customInput = row.querySelector(".variant-custom-size");
-
-    select.addEventListener("change", (e) => {
-      if (e.target.value === "Custom...") {
-        customInput.style.display = "block";
-        customInput.focus();
-      } else {
-        customInput.style.display = "none";
-      }
-    });
-
     row.querySelector(".remove-variant-btn").addEventListener("click", () => row.remove());
   }
 
@@ -195,18 +217,9 @@
     const rows = document.querySelectorAll(".variant-row");
     const variants = [];
     rows.forEach((row) => {
-      const preset = row.querySelector(".variant-preset-select")?.value;
-      const custom = row.querySelector(".variant-custom-size")?.value.trim();
-      
-      let finalSize = "Standard";
-      if (preset === "Custom...") {
-        finalSize = custom || "Custom";
-      } else {
-        finalSize = preset;
-      }
-
+      const size = row.querySelector(".variant-size-select")?.value;
       const price = Number(row.querySelector(".variant-price")?.value || 0);
-      if (finalSize && price > 0) variants.push({ size: finalSize, price });
+      if (size && price > 0) variants.push({ size, price });
     });
     return variants;
   }
@@ -275,9 +288,7 @@
     if (getEl("prod-stock")) getEl("prod-stock").value = "instock";
     prodImageBase64 = "";
 
-    if (getEl("prod-preview-img")) {
-      getEl("prod-preview-img").src = "https://placehold.co/100x100?text=Product";
-    }
+    if (getEl("prod-preview-img")) getEl("prod-preview-img").src = "https://placehold.co/100x100?text=Product";
 
     selectedCategories = [];
     renderCategoryTags();
@@ -385,12 +396,15 @@
       };
     });
 
+    const storeSizesPayload = storeSizes.map((s) => ({ stringValue: s }));
+
     const payload = {
       fields: {
         phone: { stringValue: getEl("store-phone-input")?.value.trim() || "" },
         slogan: { stringValue: getEl("store-slogan-input")?.value.trim() || "" },
         themeColor: { stringValue: getEl("store-theme-color")?.value || "#10b981" },
         logo: { stringValue: logoBase64 || "" },
+        storeSizes: { arrayValue: { values: storeSizesPayload } },
         items: { arrayValue: { values: itemsPayload } }
       }
     };
@@ -457,11 +471,26 @@
     const syncBtn = getEl("sync-cloud-btn");
     if (syncBtn) syncBtn.addEventListener("click", syncToCloud);
 
+    // Add Store-Wide Size Option
+    const addStoreSizeBtn = getEl("add-store-size-btn");
+    if (addStoreSizeBtn) {
+      addStoreSizeBtn.addEventListener("click", () => {
+        const input = getEl("new-store-size-input");
+        const val = input?.value.trim();
+        if (val) {
+          if (!storeSizes.includes(val)) storeSizes.push(val);
+          input.value = "";
+          renderStoreSizeTags();
+          renderVariantRows();
+        }
+      });
+    }
+
     const addVariantBtn = getEl("add-variant-btn");
     if (addVariantBtn) {
       addVariantBtn.addEventListener("click", () => {
         const container = getEl("variants-container");
-        if (container) createVariantRowElement(container, "Standard", "");
+        if (container) createVariantRowElement(container, storeSizes[0] || "Standard", "");
       });
     }
 
@@ -487,7 +516,7 @@
         const variants = getVariantsFromForm();
 
         if (!name) return showStatus("Please enter a product name.", "error");
-        if (variants.length === 0) return showStatus("Please select/enter at least one variant option with a price.", "error");
+        if (variants.length === 0) return showStatus("Please specify at least one size variant with a price.", "error");
 
         const productData = {
           name,
@@ -510,9 +539,10 @@
       });
     }
 
-    renderVariantRows();
+    renderStoreSizeTags();
     renderCategoryTags();
     renderProductList();
+    renderVariantRows();
 
     fetchFromCloud();
   });
