@@ -2,10 +2,10 @@
   const PROJECT_ID = "whatsapp-eco-engine-80882";
   const DEFAULT_STORE_ID = "perfumescentre";
 
-  // Safely extract store ID from URL search param
+  // Parse store key safely from URL query parameter
   const urlParams = new URLSearchParams(window.location.search);
   const rawStoreParam = urlParams.get("store");
-  const storeId = (rawStoreParam || DEFAULT_STORE_ID).trim().toLowerCase();
+  const storeId = (rawStoreParam || DEFAULT_STORE_ID).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") || DEFAULT_STORE_ID;
 
   let storeData = null;
   let cart = [];
@@ -13,7 +13,6 @@
 
   const getEl = (id) => document.getElementById(id);
 
-  // Helper to extract numeric values safely from Firestore raw field types
   function extractNumber(fieldObj, fallback = 0) {
     if (!fieldObj) return fallback;
     if (fieldObj.doubleValue !== undefined) return Number(fieldObj.doubleValue);
@@ -22,10 +21,9 @@
     return fallback;
   }
 
-  // Helper to extract string values safely
   function extractString(fieldObj, fallback = "") {
     if (!fieldObj) return fallback;
-    if (fieldObj.stringValue !== undefined) return fieldObj.stringValue;
+    if (fieldObj.stringValue !== undefined) return String(fieldObj.stringValue);
     if (fieldObj.integerValue !== undefined) return String(fieldObj.integerValue);
     if (fieldObj.doubleValue !== undefined) return String(fieldObj.doubleValue);
     return fallback;
@@ -67,7 +65,6 @@
         const parsedItems = rawItems.map((item, index) => {
           const f = item.mapValue?.fields || {};
 
-          // Extract Categories
           let cats = [];
           if (f.categories?.arrayValue?.values) {
             cats = f.categories.arrayValue.values
@@ -78,7 +75,6 @@
             if (singleCat) cats = [singleCat];
           }
 
-          // Extract Variants
           let variantsList = [];
           if (f.variants?.arrayValue?.values) {
             variantsList = f.variants.arrayValue.values.map((v) => {
@@ -120,7 +116,7 @@
         updateCartUI();
       })
       .catch((err) => {
-        console.error("[STOREFRONT CRITICAL LOAD ERROR]:", err);
+        console.error("[STOREFRONT ERROR]:", err);
         if (catalogGrid) {
           catalogGrid.innerHTML = `
             <div style="grid-column: 1/-1; text-align: center; color: #dc2626; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 24px; margin: 20px 0;">
