@@ -3,7 +3,7 @@
   const DEFAULT_STORE_ID = "perfumescentre";
 
   // State Management
-  let storeSizes = ["30ml", "50ml", "100ml", "125ml", "200ml"]; // Merchant defined size catalog
+  let storeSizes = ["30ml", "50ml", "100ml", "125ml", "200ml"];
   let availableCategories = ["General", "Men", "Women", "Unisex"];
   let selectedCategories = [];
   let products = [];
@@ -13,6 +13,11 @@
   let prodImageBase64 = "";
 
   const getEl = (id) => document.getElementById(id);
+
+  function getCleanStoreId() {
+    const raw = getEl("store-id-input")?.value || DEFAULT_STORE_ID;
+    return raw.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") || DEFAULT_STORE_ID;
+  }
 
   function showStatus(msg, type = "success") {
     console.log(`[STATUS ${type.toUpperCase()}]:`, msg);
@@ -32,6 +37,35 @@
     setTimeout(() => { if (statusMsg) statusMsg.style.display = "none"; }, 6000);
   }
 
+  // Auto-compress image files to avoid HTTP 400 payload errors
+  function compressImage(file, maxWidth = 400, quality = 0.7, callback) {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
+        callback(compressedDataUrl);
+      };
+    };
+  }
+
   function updateStoreLinkBanner(storeId) {
     const storeLinkBanner = getEl("store-link-banner");
     const storeUrlText = getEl("store-url-text");
@@ -41,16 +75,14 @@
       if (storeLinkBanner) storeLinkBanner.style.display = "none";
       return;
     }
-    const storeUrl = `${window.location.origin}${window.location.pathname.replace("dashboard.html", "index.html")}?store=${storeId.toLowerCase().trim()}`;
+    const storeUrl = `${window.location.origin}${window.location.pathname.replace("dashboard.html", "index.html")}?store=${storeId}`;
     if (storeUrlText) storeUrlText.innerText = storeUrl;
     if (visitStoreBtn) visitStoreBtn.href = storeUrl;
     if (storeLinkBanner) storeLinkBanner.style.display = "flex";
   }
 
   function fetchFromCloud() {
-    const storeIdInput = getEl("store-id-input");
-    const storeId = (storeIdInput?.value || DEFAULT_STORE_ID).trim().toLowerCase();
-
+    const storeId = getCleanStoreId();
     showStatus(`⏳ Connecting to Cloud for "${storeId}"...`, "success");
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
@@ -83,7 +115,7 @@
         const logoImg = getEl("logo-preview-img");
         if (logoImg) logoImg.src = logoBase64 || "https://placehold.co/100x100?text=Logo";
 
-        // Read store-wide size definitions
+        // Read store-wide preset size definitions
         if (fields.storeSizes?.arrayValue?.values) {
           const loadedSizes = fields.storeSizes.arrayValue.values.map(v => v.stringValue).filter(Boolean);
           if (loadedSizes.length > 0) storeSizes = loadedSizes;
@@ -144,7 +176,6 @@
       });
   }
 
-  // --- RENDER STORE-WIDE SIZES TAGS ---
   function renderStoreSizeTags() {
     const container = getEl("store-sizes-tags-list");
     if (!container) return;
@@ -170,7 +201,6 @@
     });
   }
 
-  // --- RENDER DYNAMIC VARIANT DROPDOWNS ---
   function renderVariantRows(variants = []) {
     const container = getEl("variants-container");
     if (!container) return;
@@ -190,7 +220,6 @@
     row.className = "variant-row";
     row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
 
-    // If selectedSize isn't in storeSizes, auto append
     if (selectedSize && !storeSizes.includes(selectedSize)) {
       storeSizes.push(selectedSize);
       renderStoreSizeTags();
@@ -218,7 +247,8 @@
     const variants = [];
     rows.forEach((row) => {
       const size = row.querySelector(".variant-size-select")?.value;
-      const price = Number(row.querySelector(".variant-price")?.value || 0);
+      const rawPrice = Number(row.querySelector(".variant-price")?.value || 0);
+      const price = isNaN(rawPrice) ? 0 : rawPrice;
       if (size && price > 0) variants.push({ size, price });
     });
     return variants;
@@ -360,35 +390,36 @@
   }
 
   function syncToCloud() {
-    const storeIdInput = getEl("store-id-input");
-    const storeId = (storeIdInput?.value || DEFAULT_STORE_ID).trim().toLowerCase();
-
+    const storeId = getCleanStoreId();
     showStatus(`🚀 Publishing changes for "${storeId}"...`, "success");
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     const itemsPayload = products.map((p) => {
-      const catValues = p.categories.map((c) => ({ stringValue: c }));
-      const variantValues = p.variants.map((v) => ({
-        mapValue: {
-          fields: {
-            size: { stringValue: v.size },
-            price: { doubleValue: Number(v.price) }
+      const catValues = p.categories.map((c) => ({ stringValue: String(c) }));
+      const variantValues = p.variants.map((v) => {
+        const validPrice = isNaN(Number(v.price)) ? 0 : Number(v.price);
+        return {
+          mapValue: {
+            fields: {
+              size: { stringValue: String(v.size || "Standard") },
+              price: { doubleValue: validPrice }
+            }
           }
-        }
-      }));
+        };
+      });
 
-      const primaryPrice = Number(p.variants[0]?.price || 0);
-      const primaryCategory = p.categories[0] || "General";
+      const primaryPrice = isNaN(Number(p.variants[0]?.price)) ? 0 : Number(p.variants[0]?.price);
+      const primaryCategory = String(p.categories[0] || "General");
 
       return {
         mapValue: {
           fields: {
-            name: { stringValue: p.name },
+            name: { stringValue: String(p.name || "Untitled Product") },
             category: { stringValue: primaryCategory },
             price: { doubleValue: primaryPrice },
-            stock: { stringValue: p.stock },
-            img: { stringValue: p.img },
+            stock: { stringValue: String(p.stock || "instock") },
+            img: { stringValue: String(p.img || "https://placehold.co/100x100?text=Product") },
             categories: { arrayValue: { values: catValues } },
             variants: { arrayValue: { values: variantValues } }
           }
@@ -396,14 +427,14 @@
       };
     });
 
-    const storeSizesPayload = storeSizes.map((s) => ({ stringValue: s }));
+    const storeSizesPayload = storeSizes.map((s) => ({ stringValue: String(s) }));
 
     const payload = {
       fields: {
-        phone: { stringValue: getEl("store-phone-input")?.value.trim() || "" },
-        slogan: { stringValue: getEl("store-slogan-input")?.value.trim() || "" },
-        themeColor: { stringValue: getEl("store-theme-color")?.value || "#10b981" },
-        logo: { stringValue: logoBase64 || "" },
+        phone: { stringValue: String(getEl("store-phone-input")?.value.trim() || "") },
+        slogan: { stringValue: String(getEl("store-slogan-input")?.value.trim() || "") },
+        themeColor: { stringValue: String(getEl("store-theme-color")?.value || "#10b981") },
+        logo: { stringValue: String(logoBase64 || "") },
         storeSizes: { arrayValue: { values: storeSizesPayload } },
         items: { arrayValue: { values: itemsPayload } }
       }
@@ -414,8 +445,12 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Publish failed (HTTP ${res.status})`);
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          console.error("[FIRESTORE REJECTION DETAILS]:", errData);
+          throw new Error(errData.error?.message || `HTTP ${res.status}`);
+        }
         return res.json();
       })
       .then(() => {
@@ -423,7 +458,7 @@
         showStatus(`🎉 Successfully published store "${storeId}" to the cloud!`);
       })
       .catch((err) => {
-        showStatus(`Failed to publish: ${err.message}`, "error");
+        showStatus(`Publish failed: ${err.message}`, "error");
       });
   }
 
@@ -438,13 +473,11 @@
       logoFileInput.addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (file) {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            logoBase64 = evt.target.result;
+          compressImage(file, 300, 0.7, (compressedBase64) => {
+            logoBase64 = compressedBase64;
             const preview = getEl("logo-preview-img");
             if (preview) preview.src = logoBase64;
-          };
-          reader.readAsDataURL(file);
+          });
         }
       });
     }
@@ -454,13 +487,11 @@
       prodImgInput.addEventListener("change", (e) => {
         const file = e.target.files[0];
         if (file) {
-          const reader = new FileReader();
-          reader.onload = (evt) => {
-            prodImageBase64 = evt.target.result;
+          compressImage(file, 500, 0.7, (compressedBase64) => {
+            prodImageBase64 = compressedBase64;
             const preview = getEl("prod-preview-img");
             if (preview) preview.src = prodImageBase64;
-          };
-          reader.readAsDataURL(file);
+          });
         }
       });
     }
@@ -471,7 +502,6 @@
     const syncBtn = getEl("sync-cloud-btn");
     if (syncBtn) syncBtn.addEventListener("click", syncToCloud);
 
-    // Add Store-Wide Size Option
     const addStoreSizeBtn = getEl("add-store-size-btn");
     if (addStoreSizeBtn) {
       addStoreSizeBtn.addEventListener("click", () => {
