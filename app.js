@@ -47,7 +47,7 @@
             variantsList = f.variants.arrayValue.values.map((v) => {
               const vf = v.mapValue?.fields || {};
               return {
-                size: vf.size?.stringValue || "100ml",
+                size: vf.size?.stringValue || "Standard",
                 price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
               };
             });
@@ -55,7 +55,7 @@
 
           const fallbackPrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
           if (variantsList.length === 0) {
-            variantsList = [{ size: "100ml", price: fallbackPrice }];
+            variantsList = [{ size: "Standard", price: fallbackPrice }];
           }
 
           return {
@@ -190,7 +190,7 @@
   }
 
   function addToCart(product, variantIndex) {
-    const variant = product.variants[variantIndex] || { size: "100ml", price: product.price };
+    const variant = product.variants[variantIndex] || { size: "Standard", price: product.price };
     
     const existingIndex = cart.findIndex(
       (c) => c.product.id === product.id && c.selectedSize === variant.size
