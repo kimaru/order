@@ -2,6 +2,9 @@
   const PROJECT_ID = "whatsapp-eco-engine-80882";
   const DEFAULT_STORE_ID = "perfumescentre";
 
+  // Standard sizes for dropdown
+  const STANDARD_SIZES = ["30ml", "50ml", "100ml", "125ml", "200ml", "Standard", "Custom"];
+
   // State Management
   let products = [];
   let availableCategories = ["Men", "Women", "Unisex", "Designer", "Niche"];
@@ -60,17 +63,13 @@
     fetch(firestoreUrl)
       .then((res) => {
         if (res.status === 404) {
-          throw new Error(`Store "${storeId}" is not published in Firestore yet. Add your items below and click "Publish All Changes" to create it!`);
+          throw new Error(`Store "${storeId}" is not published yet. Fill in details and click "Publish All Changes".`);
         }
-        if (!res.ok) {
-          throw new Error(`HTTP Error ${res.status} while fetching store data.`);
-        }
+        if (!res.ok) throw new Error(`HTTP Error ${res.status} while fetching store data.`);
         return res.json();
       })
       .then((doc) => {
-        if (!doc || !doc.fields) {
-          throw new Error(`Document for "${storeId}" exists but contains no fields.`);
-        }
+        if (!doc || !doc.fields) throw new Error(`Store document for "${storeId}" contains no fields.`);
 
         const fields = doc.fields;
 
@@ -112,15 +111,15 @@
             variantsList = f.variants.arrayValue.values.map((v) => {
               const vf = v.mapValue?.fields || {};
               return {
-                size: vf.size?.stringValue || "Standard",
+                size: vf.size?.stringValue || "100ml",
                 price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
               };
             });
           }
 
-          const basePrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
+          const fallbackPrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
           if (variantsList.length === 0) {
-            variantsList = [{ size: "Standard", price: basePrice }];
+            variantsList = [{ size: "100ml", price: fallbackPrice }];
           }
 
           return {
@@ -142,6 +141,7 @@
       });
   }
 
+  // --- VARIANT DROPDOWN UI ---
   function renderVariantRows(variants = []) {
     const container = getEl("variants-container");
     if (!container) return;
@@ -155,8 +155,22 @@
       const row = document.createElement("div");
       row.className = "variant-row";
       row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
+
+      // Build options for Size Dropdown
+      let sizeOptionsHTML = STANDARD_SIZES.map((s) => {
+        const isSel = (v.size === s) ? "selected" : "";
+        return `<option value="${s}" ${isSel}>${s}</option>`;
+      }).join("");
+
+      // If existing variant size isn't in standard list, append it dynamically
+      if (v.size && !STANDARD_SIZES.includes(v.size)) {
+        sizeOptionsHTML += `<option value="${v.size}" selected>${v.size}</option>`;
+      }
+
       row.innerHTML = `
-        <input type="text" class="variant-size" placeholder="Size (e.g. 100ml)" value="${v.size || ""}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+        <select class="variant-size-select" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
+          ${sizeOptionsHTML}
+        </select>
         <input type="number" class="variant-price" placeholder="Price (KSh)" value="${v.price || ""}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
         <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
       `;
@@ -169,7 +183,7 @@
     const rows = document.querySelectorAll(".variant-row");
     const variants = [];
     rows.forEach((row) => {
-      const size = row.querySelector(".variant-size")?.value.trim();
+      const size = row.querySelector(".variant-size-select")?.value || "100ml";
       const price = Number(row.querySelector(".variant-price")?.value || 0);
       if (size && price > 0) variants.push({ size, price });
     });
@@ -333,12 +347,14 @@
       }));
 
       const primaryPrice = Number(p.variants[0]?.price || 0);
+      const primaryCategory = p.categories[0] || "General";
 
       return {
         mapValue: {
           fields: {
             name: { stringValue: p.name },
-            price: { doubleValue: primaryPrice }, // Top level fallback price
+            category: { stringValue: primaryCategory }, // Legacy single fallback
+            price: { doubleValue: primaryPrice },      // Legacy single fallback
             stock: { stringValue: p.stock },
             img: { stringValue: p.img },
             categories: { arrayValue: { values: catValues } },
@@ -428,8 +444,13 @@
         const row = document.createElement("div");
         row.className = "variant-row";
         row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
+
+        let sizeOptionsHTML = STANDARD_SIZES.map((s) => `<option value="${s}">${s}</option>`).join("");
+
         row.innerHTML = `
-          <input type="text" class="variant-size" placeholder="Size (e.g. 50ml)" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+          <select class="variant-size-select" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
+            ${sizeOptionsHTML}
+          </select>
           <input type="number" class="variant-price" placeholder="Price (KSh)" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
           <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
         `;
@@ -460,7 +481,7 @@
         const variants = getVariantsFromForm();
 
         if (!name) return showStatus("Please enter a product name.", "error");
-        if (variants.length === 0) return showStatus("Please enter at least one size variant with a price.", "error");
+        if (variants.length === 0) return showStatus("Please select at least one size variant with a price.", "error");
 
         const productData = {
           name,
