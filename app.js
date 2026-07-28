@@ -2,14 +2,34 @@
   const PROJECT_ID = "whatsapp-eco-engine-80882";
   const DEFAULT_STORE_ID = "perfumescentre";
 
+  // Safely extract store ID from URL search param
   const urlParams = new URLSearchParams(window.location.search);
-  const storeId = (urlParams.get("store") || DEFAULT_STORE_ID).toLowerCase().trim();
+  const rawStoreParam = urlParams.get("store");
+  const storeId = (rawStoreParam || DEFAULT_STORE_ID).trim().toLowerCase();
 
   let storeData = null;
   let cart = [];
   let activeCategory = "All";
 
   const getEl = (id) => document.getElementById(id);
+
+  // Helper to extract numeric values safely from Firestore raw field types
+  function extractNumber(fieldObj, fallback = 0) {
+    if (!fieldObj) return fallback;
+    if (fieldObj.doubleValue !== undefined) return Number(fieldObj.doubleValue);
+    if (fieldObj.integerValue !== undefined) return Number(fieldObj.integerValue);
+    if (fieldObj.stringValue !== undefined) return Number(fieldObj.stringValue) || fallback;
+    return fallback;
+  }
+
+  // Helper to extract string values safely
+  function extractString(fieldObj, fallback = "") {
+    if (!fieldObj) return fallback;
+    if (fieldObj.stringValue !== undefined) return fieldObj.stringValue;
+    if (fieldObj.integerValue !== undefined) return String(fieldObj.integerValue);
+    if (fieldObj.doubleValue !== undefined) return String(fieldObj.doubleValue);
+    return fallback;
+  }
 
   function getItemPrice(item, variantIndex = 0) {
     if (item.variants && item.variants[variantIndex]) {
@@ -19,61 +39,78 @@
   }
 
   function loadStoreData() {
+    const catalogGrid = getEl("catalog-grid");
+    if (catalogGrid) {
+      catalogGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 40px;">⏳ Loading store catalog...</p>`;
+    }
+
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) throw new Error("Store database record not found.");
+        if (res.status === 404) {
+          throw new Error(`Store document "${storeId}" was not found in database. Open dashboard and click "Publish All Changes".`);
+        }
+        if (!res.ok) {
+          throw new Error(`Cloud connection failed with HTTP status ${res.status}.`);
+        }
         return res.json();
       })
       .then((doc) => {
-        if (!doc || !doc.fields) throw new Error("Store fields are empty.");
+        if (!doc || !doc.fields) {
+          throw new Error(`Store dataset for "${storeId}" is currently empty.`);
+        }
 
-        const fields = doc.fields;
+        const fields = doc.fields || {};
         const rawItems = fields.items?.arrayValue?.values || [];
 
         const parsedItems = rawItems.map((item, index) => {
           const f = item.mapValue?.fields || {};
 
+          // Extract Categories
           let cats = [];
           if (f.categories?.arrayValue?.values) {
-            cats = f.categories.arrayValue.values.map((v) => v.stringValue).filter(Boolean);
-          } else if (f.category?.stringValue) {
-            cats = [f.category.stringValue];
+            cats = f.categories.arrayValue.values
+              .map((v) => extractString(v))
+              .filter(Boolean);
+          } else if (f.category) {
+            const singleCat = extractString(f.category);
+            if (singleCat) cats = [singleCat];
           }
 
+          // Extract Variants
           let variantsList = [];
           if (f.variants?.arrayValue?.values) {
             variantsList = f.variants.arrayValue.values.map((v) => {
               const vf = v.mapValue?.fields || {};
               return {
-                size: vf.size?.stringValue || "Standard",
-                price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
+                size: extractString(vf.size, "Standard"),
+                price: extractNumber(vf.price, 0)
               };
             });
           }
 
-          const fallbackPrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
+          const fallbackPrice = extractNumber(f.price, 0);
           if (variantsList.length === 0) {
             variantsList = [{ size: "Standard", price: fallbackPrice }];
           }
 
           return {
             id: index,
-            name: f.name?.stringValue || `Item ${index + 1}`,
+            name: extractString(f.name, `Product ${index + 1}`),
             price: fallbackPrice || variantsList[0].price,
             categories: cats.length ? cats : ["General"],
             variants: variantsList,
-            stock: f.stock?.stringValue || "instock",
-            img: f.img?.stringValue || "https://placehold.co/200x200?text=Product"
+            stock: extractString(f.stock, "instock"),
+            img: extractString(f.img, "https://placehold.co/200x200?text=Product")
           };
         });
 
         storeData = {
-          phone: fields.phone?.stringValue || "",
-          slogan: fields.slogan?.stringValue || "Welcome to our store",
-          themeColor: fields.themeColor?.stringValue || "#10b981",
-          logo: fields.logo?.stringValue || "",
+          phone: extractString(fields.phone, ""),
+          slogan: extractString(fields.slogan, "Welcome to our store"),
+          themeColor: extractString(fields.themeColor, "#10b981"),
+          logo: extractString(fields.logo, ""),
           items: parsedItems
         };
 
@@ -83,10 +120,14 @@
         updateCartUI();
       })
       .catch((err) => {
-        console.error("[STOREFRONT ERROR]:", err);
-        const catalogGrid = getEl("catalog-grid");
+        console.error("[STOREFRONT CRITICAL LOAD ERROR]:", err);
         if (catalogGrid) {
-          catalogGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 40px;">Unable to load store "${storeId}". Open the dashboard, add items, and click "Publish All Changes".</p>`;
+          catalogGrid.innerHTML = `
+            <div style="grid-column: 1/-1; text-align: center; color: #dc2626; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 24px; margin: 20px 0;">
+              <h4 style="font-weight: 700; margin-bottom: 8px;">Unable to Load Store</h4>
+              <p style="font-size: 13px;">${err.message}</p>
+            </div>
+          `;
         }
       });
   }
@@ -155,7 +196,7 @@
           <p class="product-cats" style="font-size: 11px; color: #64748b; margin-bottom: 8px;">${item.categories.join(", ")}</p>
           
           <div style="margin: 8px 0;">
-            <select class="variant-dropdown" data-id="${item.id}" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px;">
+            <select class="variant-dropdown" data-id="${item.id}" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; background: #fff;">
               ${variantOptionsHTML}
             </select>
           </div>
@@ -174,18 +215,23 @@
       grid.appendChild(card);
 
       const dropdown = card.querySelector(`.variant-dropdown`);
-      dropdown.addEventListener("change", (e) => {
-        const vIdx = Number(e.target.value);
-        const priceLabel = getEl(`price-display-${item.id}`);
-        if (priceLabel) {
-          priceLabel.innerText = `KSh ${getItemPrice(item, vIdx).toLocaleString()}`;
-        }
-      });
+      if (dropdown) {
+        dropdown.addEventListener("change", (e) => {
+          const vIdx = Number(e.target.value);
+          const priceLabel = getEl(`price-display-${item.id}`);
+          if (priceLabel) {
+            priceLabel.innerText = `KSh ${getItemPrice(item, vIdx).toLocaleString()}`;
+          }
+        });
+      }
 
-      card.querySelector(".add-to-cart-btn").addEventListener("click", () => {
-        const selectedVariantIdx = Number(dropdown.value);
-        addToCart(item, selectedVariantIdx);
-      });
+      const addBtn = card.querySelector(".add-to-cart-btn");
+      if (addBtn) {
+        addBtn.addEventListener("click", () => {
+          const selectedVariantIdx = dropdown ? Number(dropdown.value) : 0;
+          addToCart(item, selectedVariantIdx);
+        });
+      }
     });
   }
 
