@@ -66,7 +66,7 @@
     };
   }
 
-  // RESTORED: Simple, reliable relative link builder
+  // Robust URL Builder for all routing environments
   function updateStoreLinkBanner(storeId) {
     const storeLinkBanner = getEl("store-link-banner");
     const storeUrlText = getEl("store-url-text");
@@ -77,8 +77,18 @@
       return;
     }
 
-    // Direct relative path replacement (Original Working Implementation)
-    const storeUrl = `${window.location.origin}${window.location.pathname.replace("dashboard.html", "index.html")}?store=${storeId}`;
+    const origin = window.location.origin;
+    let path = window.location.pathname;
+
+    if (path.endsWith("dashboard.html")) {
+      path = path.substring(0, path.length - "dashboard.html".length);
+    }
+
+    if (!path.endsWith("/")) {
+      path += "/";
+    }
+
+    const storeUrl = `${origin}${path}index.html?store=${storeId}`;
 
     if (storeUrlText) storeUrlText.innerText = storeUrl;
     if (visitStoreBtn) {
