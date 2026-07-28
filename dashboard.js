@@ -66,7 +66,7 @@
     };
   }
 
-  // Updated URL Builder to safely resolve index.html without looping to dashboard
+  // RESTORED: Simple, reliable relative link builder
   function updateStoreLinkBanner(storeId) {
     const storeLinkBanner = getEl("store-link-banner");
     const storeUrlText = getEl("store-url-text");
@@ -77,19 +77,8 @@
       return;
     }
 
-    const origin = window.location.origin;
-    let pathname = window.location.pathname;
-
-    if (pathname.endsWith("dashboard.html")) {
-      pathname = pathname.replace("dashboard.html", "index.html");
-    } else if (pathname.endsWith("/")) {
-      pathname = pathname + "index.html";
-    } else {
-      const lastSlash = pathname.lastIndexOf("/");
-      pathname = pathname.substring(0, lastSlash + 1) + "index.html";
-    }
-
-    const storeUrl = `${origin}${pathname}?store=${storeId}`;
+    // Direct relative path replacement (Original Working Implementation)
+    const storeUrl = `${window.location.origin}${window.location.pathname.replace("dashboard.html", "index.html")}?store=${storeId}`;
 
     if (storeUrlText) storeUrlText.innerText = storeUrl;
     if (visitStoreBtn) {
