@@ -2,12 +2,10 @@
   const PROJECT_ID = "whatsapp-eco-engine-80882";
   const DEFAULT_STORE_ID = "perfumescentre";
 
-  // Standard sizes for dropdown
-  const STANDARD_SIZES = ["30ml", "50ml", "100ml", "125ml", "200ml", "Standard", "Custom"];
+  const COMMON_SIZES = ["Standard", "30ml", "50ml", "100ml", "125ml", "200ml", "Small (S)", "Medium (M)", "Large (L)", "XL", "2XL", "Custom..."];
 
-  // State Management
   let products = [];
-  let availableCategories = ["Men", "Women", "Unisex", "Designer", "Niche"];
+  let availableCategories = ["General", "Men", "Women", "Unisex"];
   let selectedCategories = [];
   let editingIndex = null;
 
@@ -63,13 +61,13 @@
     fetch(firestoreUrl)
       .then((res) => {
         if (res.status === 404) {
-          throw new Error(`Store "${storeId}" is not published yet. Fill in details and click "Publish All Changes".`);
+          throw new Error(`Store "${storeId}" not published yet. Add items and click "Publish All Changes".`);
         }
-        if (!res.ok) throw new Error(`HTTP Error ${res.status} while fetching store data.`);
+        if (!res.ok) throw new Error(`HTTP Error ${res.status} while fetching data.`);
         return res.json();
       })
       .then((doc) => {
-        if (!doc || !doc.fields) throw new Error(`Store document for "${storeId}" contains no fields.`);
+        if (!doc || !doc.fields) throw new Error(`Document for "${storeId}" is empty.`);
 
         const fields = doc.fields;
 
@@ -111,7 +109,7 @@
             variantsList = f.variants.arrayValue.values.map((v) => {
               const vf = v.mapValue?.fields || {};
               return {
-                size: vf.size?.stringValue || "100ml",
+                size: vf.size?.stringValue || "Standard",
                 price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
               };
             });
@@ -119,7 +117,7 @@
 
           const fallbackPrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
           if (variantsList.length === 0) {
-            variantsList = [{ size: "100ml", price: fallbackPrice }];
+            variantsList = [{ size: "Standard", price: fallbackPrice }];
           }
 
           return {
@@ -141,51 +139,74 @@
       });
   }
 
-  // --- VARIANT DROPDOWN UI ---
+  // --- HYBRID VARIANT ROW (Dropdown + Custom Text Input) ---
   function renderVariantRows(variants = []) {
     const container = getEl("variants-container");
     if (!container) return;
     container.innerHTML = "";
 
     if (variants.length === 0) {
-      variants = [{ size: "100ml", price: "" }];
+      variants = [{ size: "Standard", price: "" }];
     }
 
     variants.forEach((v) => {
-      const row = document.createElement("div");
-      row.className = "variant-row";
-      row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
-
-      // Build options for Size Dropdown
-      let sizeOptionsHTML = STANDARD_SIZES.map((s) => {
-        const isSel = (v.size === s) ? "selected" : "";
-        return `<option value="${s}" ${isSel}>${s}</option>`;
-      }).join("");
-
-      // If existing variant size isn't in standard list, append it dynamically
-      if (v.size && !STANDARD_SIZES.includes(v.size)) {
-        sizeOptionsHTML += `<option value="${v.size}" selected>${v.size}</option>`;
-      }
-
-      row.innerHTML = `
-        <select class="variant-size-select" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
-          ${sizeOptionsHTML}
-        </select>
-        <input type="number" class="variant-price" placeholder="Price (KSh)" value="${v.price || ""}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
-        <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
-      `;
-      container.appendChild(row);
-      row.querySelector(".remove-variant-btn").addEventListener("click", () => row.remove());
+      createVariantRowElement(container, v.size, v.price);
     });
+  }
+
+  function createVariantRowElement(container, initialSize = "Standard", initialPrice = "") {
+    const row = document.createElement("div");
+    row.className = "variant-row";
+    row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
+
+    const isPreset = COMMON_SIZES.includes(initialSize);
+    const selectedPreset = isPreset ? initialSize : "Custom...";
+    const customValue = isPreset ? "" : initialSize;
+
+    let optionsHTML = COMMON_SIZES.map(s => `<option value="${s}" ${s === selectedPreset ? "selected" : ""}>${s}</option>`).join("");
+
+    row.innerHTML = `
+      <select class="variant-preset-select" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
+        ${optionsHTML}
+      </select>
+      <input type="text" class="variant-custom-size" placeholder="Type custom size/option..." value="${customValue}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; display: ${selectedPreset === "Custom..." ? "block" : "none"};">
+      <input type="number" class="variant-price" placeholder="Price (KSh)" value="${initialPrice || ""}" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
+      <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
+    `;
+
+    container.appendChild(row);
+
+    const select = row.querySelector(".variant-preset-select");
+    const customInput = row.querySelector(".variant-custom-size");
+
+    select.addEventListener("change", (e) => {
+      if (e.target.value === "Custom...") {
+        customInput.style.display = "block";
+        customInput.focus();
+      } else {
+        customInput.style.display = "none";
+      }
+    });
+
+    row.querySelector(".remove-variant-btn").addEventListener("click", () => row.remove());
   }
 
   function getVariantsFromForm() {
     const rows = document.querySelectorAll(".variant-row");
     const variants = [];
     rows.forEach((row) => {
-      const size = row.querySelector(".variant-size-select")?.value || "100ml";
+      const preset = row.querySelector(".variant-preset-select")?.value;
+      const custom = row.querySelector(".variant-custom-size")?.value.trim();
+      
+      let finalSize = "Standard";
+      if (preset === "Custom...") {
+        finalSize = custom || "Custom";
+      } else {
+        finalSize = preset;
+      }
+
       const price = Number(row.querySelector(".variant-price")?.value || 0);
-      if (size && price > 0) variants.push({ size, price });
+      if (finalSize && price > 0) variants.push({ size: finalSize, price });
     });
     return variants;
   }
@@ -353,8 +374,8 @@
         mapValue: {
           fields: {
             name: { stringValue: p.name },
-            category: { stringValue: primaryCategory }, // Legacy single fallback
-            price: { doubleValue: primaryPrice },      // Legacy single fallback
+            category: { stringValue: primaryCategory },
+            price: { doubleValue: primaryPrice },
             stock: { stringValue: p.stock },
             img: { stringValue: p.img },
             categories: { arrayValue: { values: catValues } },
@@ -440,22 +461,7 @@
     if (addVariantBtn) {
       addVariantBtn.addEventListener("click", () => {
         const container = getEl("variants-container");
-        if (!container) return;
-        const row = document.createElement("div");
-        row.className = "variant-row";
-        row.style.cssText = "display: flex; gap: 8px; margin-bottom: 8px; align-items: center;";
-
-        let sizeOptionsHTML = STANDARD_SIZES.map((s) => `<option value="${s}">${s}</option>`).join("");
-
-        row.innerHTML = `
-          <select class="variant-size-select" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff;">
-            ${sizeOptionsHTML}
-          </select>
-          <input type="number" class="variant-price" placeholder="Price (KSh)" style="flex: 1; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px;">
-          <button type="button" class="remove-variant-btn" style="background: #fee2e2; color: #991b1b; border: none; border-radius: 6px; padding: 8px 12px; cursor: pointer;">✕</button>
-        `;
-        container.appendChild(row);
-        row.querySelector(".remove-variant-btn").addEventListener("click", () => row.remove());
+        if (container) createVariantRowElement(container, "Standard", "");
       });
     }
 
@@ -481,7 +487,7 @@
         const variants = getVariantsFromForm();
 
         if (!name) return showStatus("Please enter a product name.", "error");
-        if (variants.length === 0) return showStatus("Please select at least one size variant with a price.", "error");
+        if (variants.length === 0) return showStatus("Please select/enter at least one variant option with a price.", "error");
 
         const productData = {
           name,
