@@ -66,6 +66,7 @@
     };
   }
 
+  // Updated URL Builder to safely resolve index.html without looping to dashboard
   function updateStoreLinkBanner(storeId) {
     const storeLinkBanner = getEl("store-link-banner");
     const storeUrlText = getEl("store-url-text");
@@ -75,9 +76,26 @@
       if (storeLinkBanner) storeLinkBanner.style.display = "none";
       return;
     }
-    const storeUrl = `${window.location.origin}${window.location.pathname.replace("dashboard.html", "index.html")}?store=${storeId}`;
+
+    const origin = window.location.origin;
+    let pathname = window.location.pathname;
+
+    if (pathname.endsWith("dashboard.html")) {
+      pathname = pathname.replace("dashboard.html", "index.html");
+    } else if (pathname.endsWith("/")) {
+      pathname = pathname + "index.html";
+    } else {
+      const lastSlash = pathname.lastIndexOf("/");
+      pathname = pathname.substring(0, lastSlash + 1) + "index.html";
+    }
+
+    const storeUrl = `${origin}${pathname}?store=${storeId}`;
+
     if (storeUrlText) storeUrlText.innerText = storeUrl;
-    if (visitStoreBtn) visitStoreBtn.href = storeUrl;
+    if (visitStoreBtn) {
+      visitStoreBtn.href = storeUrl;
+      visitStoreBtn.target = "_blank";
+    }
     if (storeLinkBanner) storeLinkBanner.style.display = "flex";
   }
 
