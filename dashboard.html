@@ -5,177 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Store Catalog Dashboard</title>
   <style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    }
-
-    body {
-      background-color: #f8fafc;
-      color: #0f172a;
-      padding: 20px;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .card {
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    }
-
-    .card-title {
-      font-size: 16px;
-      font-weight: 700;
-      color: #1e293b;
-      margin-bottom: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    #status-msg {
-      display: none;
-      padding: 12px 16px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 500;
-      border: 1px solid transparent;
-      margin-bottom: 10px;
-    }
-
-    #store-link-banner {
-      display: none;
-      background: #eff6ff;
-      border: 1px solid #bfdbfe;
-      color: #1d4ed8;
-      padding: 12px 16px;
-      border-radius: 8px;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .form-group {
-      margin-bottom: 16px;
-    }
-
-    .form-group label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: #475569;
-      margin-bottom: 6px;
-    }
-
-    input[type="text"],
-    input[type="number"],
-    select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid #cbd5e1;
-      border-radius: 6px;
-      font-size: 14px;
-      outline: none;
-      background: #ffffff;
-    }
-
-    input:focus, select:focus {
-      border-color: #2563eb;
-      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
-    }
-
-    .row-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
-    }
-
-    .btn {
-      padding: 10px 16px;
-      border-radius: 6px;
-      font-weight: 600;
-      font-size: 14px;
-      cursor: pointer;
-      border: none;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: background 0.2s;
-    }
-
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #f8fafc; color: #0f172a; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
+    .card-title { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+    #status-msg { display: none; padding: 12px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; border: 1px solid transparent; margin-bottom: 10px; }
+    #store-link-banner { display: none; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 12px 16px; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    input[type="text"], input[type="number"], select { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; background: #ffffff; }
+    input:focus, select:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .btn { padding: 10px 16px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s; }
     .btn-primary { background: #2563eb; color: #ffffff; }
     .btn-primary:hover { background: #1d4ed8; }
-
     .btn-success { background: #10b981; color: #ffffff; }
     .btn-success:hover { background: #059669; }
-
     .btn-secondary { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
     .btn-secondary:hover { background: #e2e8f0; }
-
-    .cat-tags-container {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin-top: 8px;
-    }
-
-    .cat-tag {
-      background: #f1f5f9;
-      color: #475569;
-      border: 1px solid #cbd5e1;
-      padding: 6px 12px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      user-select: none;
-    }
-
-    .cat-tag.selected {
-      background: #2563eb;
-      color: #ffffff;
-      border-color: #2563eb;
-    }
-
-    .remove-cat-x {
-      font-size: 10px;
-      opacity: 0.7;
-    }
+    .cat-tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .cat-tag { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+    .cat-tag.selected { background: #2563eb; color: #ffffff; border-color: #2563eb; }
+    .remove-cat-x { font-size: 10px; opacity: 0.7; }
     .remove-cat-x:hover { opacity: 1; }
-
-    .badge {
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
     .badge-instock { background: #dcfce7; color: #15803d; }
     .badge-outstock { background: #fee2e2; color: #b91c1c; }
-
-    .preview-thumb {
-      width: 50px;
-      height: 50px;
-      object-fit: cover;
-      border-radius: 6px;
-      border: 1px solid #cbd5e1;
-    }
+    .preview-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; }
   </style>
 </head>
 <body>
@@ -215,7 +72,7 @@
     <div class="row-2">
       <div class="form-group">
         <label for="store-slogan-input">Store Tagline / Slogan</label>
-        <input type="text" id="store-slogan-input" placeholder="e.g. Quality products delivered to you">
+        <input type="text" id="store-slogan-input" placeholder="e.g. Premium quality products">
       </div>
       <div class="form-group">
         <label for="store-theme-color">Brand Theme Color</label>
@@ -223,6 +80,16 @@
           <input type="color" id="store-theme-color" value="#10b981" style="height: 40px; width: 60px; padding: 2px; border-radius: 6px; cursor: pointer;">
           <span id="color-hex-label" style="font-size: 13px; font-weight: 600; color: #64748b;">#10b981</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Merchant Store-Wide Custom Sizes Preset -->
+    <div class="form-group">
+      <label>Store-Wide Available Sizes / Variants (Used in product dropdowns)</label>
+      <div id="store-sizes-tags-list" class="cat-tags-container"></div>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <input type="text" id="new-store-size-input" placeholder="e.g. 30ml, 100ml, XL, 1kg..." style="max-width: 250px;">
+        <button id="add-store-size-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">+ Add Size Option</button>
       </div>
     </div>
 
@@ -242,7 +109,7 @@
     <div class="row-2">
       <div class="form-group">
         <label for="prod-name">Product Name</label>
-        <input type="text" id="prod-name" placeholder="e.g. T-Shirt, Perfume, Headphones">
+        <input type="text" id="prod-name" placeholder="e.g. Sauvage, T-Shirt, Coffee">
       </div>
       <div class="form-group">
         <label for="prod-stock">Stock Availability</label>
@@ -253,22 +120,21 @@
       </div>
     </div>
 
-    <!-- Category Selection & Management -->
+    <!-- Category Selection -->
     <div class="form-group">
-      <label>Categories (Click tags to assign)</label>
+      <label>Categories (Click tags to assign to product)</label>
       <div id="category-tags-list" class="cat-tags-container"></div>
-      
       <div style="display: flex; gap: 8px; margin-top: 10px;">
         <input type="text" id="prod-new-category-input" placeholder="New category name..." style="max-width: 250px;">
-        <button id="add-category-tag-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">+ Add Tag</button>
+        <button id="add-category-tag-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">+ Add Category Tag</button>
       </div>
     </div>
 
-    <!-- Dynamic Size Variants & Prices -->
+    <!-- Product Size Variants & Prices -->
     <div class="form-group">
-      <label>Variants / Options & Prices (KSh)</label>
+      <label>Size Options & Prices (KSh)</label>
       <div id="variants-container"></div>
-      <button id="add-variant-btn" type="button" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; margin-top: 4px;">+ Add Option Variant</button>
+      <button id="add-variant-btn" type="button" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; margin-top: 4px;">+ Add Option Row</button>
     </div>
 
     <!-- Product Image -->
@@ -297,7 +163,6 @@
 
 </div>
 
-<!-- Application Logic -->
 <script src="dashboard.js"></script>
 </body>
 </html>
