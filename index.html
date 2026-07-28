@@ -3,71 +3,166 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Storefront</title>
+  <title>Store Catalog Dashboard</title>
   <style>
-    :root { --primary-color: #10b981; }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background-color: #f8fafc; color: #0f172a; padding-bottom: 80px; }
-    header { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; sticky: top; }
-    .logo-box { display: flex; align-items: center; gap: 12px; }
-    .logo-box img { height: 40px; width: 40px; object-fit: cover; border-radius: 8px; }
-    .cat-nav { display: flex; gap: 8px; overflow-x: auto; padding: 12px 20px; background: #ffffff; border-bottom: 1px solid #f1f5f9; }
-    .cat-filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #cbd5e1; background: #ffffff; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
-    .cat-filter-btn.active { background: var(--primary-color); color: #ffffff; border-color: var(--primary-color); }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 20px; max-width: 1100px; margin: 0 auto; }
-    .product-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
-    .product-img { width: 100%; height: 180px; object-fit: cover; background: #f1f5f9; }
-    .product-details { padding: 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
-    .cart-btn-fixed { position: fixed; bottom: 20px; right: 20px; background: var(--primary-color); color: #ffffff; padding: 12px 20px; border-radius: 30px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px; }
-    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
-    .modal-content { background: #ffffff; width: 90%; max-width: 450px; border-radius: 12px; padding: 20px; max-height: 80vh; display: flex; flex-direction: column; }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: #f8fafc; color: #0f172a; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05); }
+    .card-title { font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; }
+    #status-msg { display: none; padding: 12px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; border: 1px solid transparent; margin-bottom: 10px; }
+    #store-link-banner { display: none; background: #eff6ff; border: 1px solid #bfdbfe; color: #1d4ed8; padding: 12px 16px; border-radius: 8px; align-items: center; justify-content: space-between; gap: 10px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+    input[type="text"], input[type="number"], select { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; outline: none; background: #ffffff; }
+    input:focus, select:focus { border-color: #2563eb; box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1); }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .btn { padding: 10px 16px; border-radius: 6px; font-weight: 600; font-size: 14px; cursor: pointer; border: none; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: background 0.2s; }
+    .btn-primary { background: #2563eb; color: #ffffff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-success { background: #10b981; color: #ffffff; }
+    .btn-success:hover { background: #059669; }
+    .btn-secondary { background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; }
+    .btn-secondary:hover { background: #e2e8f0; }
+    .cat-tags-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+    .cat-tag { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; user-select: none; }
+    .cat-tag.selected { background: #2563eb; color: #ffffff; border-color: #2563eb; }
+    .remove-cat-x { font-size: 10px; opacity: 0.7; }
+    .remove-cat-x:hover { opacity: 1; }
+    .badge { padding: 4px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+    .badge-instock { background: #dcfce7; color: #15803d; }
+    .badge-outstock { background: #fee2e2; color: #b91c1c; }
+    .preview-thumb { width: 50px; height: 50px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; }
   </style>
 </head>
 <body>
 
-  <header>
-    <div class="logo-box">
-      <img id="store-logo" src="https://placehold.co/100x100?text=Logo" alt="Logo">
-      <div>
-        <h2 style="font-size: 16px; font-weight: 700;">Storefront</h2>
-        <p id="store-slogan" style="font-size: 12px; color: #64748b;">Loading store...</p>
+<div class="container">
+
+  <!-- Status / Error Notification Banner -->
+  <div id="status-msg"></div>
+
+  <!-- Store Public URL Link Banner -->
+  <div id="store-link-banner">
+    <div>
+      <span style="font-weight: 600; font-size: 13px;">Live Store URL:</span>
+      <span id="store-url-text" style="font-size: 13px; text-decoration: underline; word-break: break-all;"></span>
+    </div>
+    <a id="visit-store-btn" href="#" target="_blank" class="btn btn-primary" style="padding: 6px 12px; font-size: 12px; text-decoration: none;">Visit Store ↗</a>
+  </div>
+
+  <!-- STORE IDENTITY CONFIGURATION -->
+  <div class="card">
+    <div class="card-title">
+      <span>🏬 Store Connection & Branding</span>
+      <button id="fetch-cloud-btn" type="button" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px;">☁️ Fetch from Cloud</button>
+    </div>
+
+    <div class="row-2">
+      <div class="form-group">
+        <label for="store-id-input">Store ID (Database Key)</label>
+        <input type="text" id="store-id-input" value="perfumescentre" placeholder="e.g. perfumescentre">
+      </div>
+      <div class="form-group">
+        <label for="store-phone-input">WhatsApp Phone Number</label>
+        <input type="text" id="store-phone-input" placeholder="e.g. 254700000000">
       </div>
     </div>
-  </header>
 
-  <!-- Categories Filter Bar -->
-  <div id="category-nav" class="cat-nav"></div>
-
-  <!-- Products Catalog Grid -->
-  <div id="catalog-grid" class="grid"></div>
-
-  <!-- Floating Cart Trigger Button -->
-  <button id="open-cart-btn" class="cart-btn-fixed">
-    🛒 Cart (<span id="cart-count">0</span>)
-  </button>
-
-  <!-- Cart Modal -->
-  <div id="cart-modal" class="modal-overlay">
-    <div class="modal-content">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-        <h3 style="font-size: 16px; font-weight: 700;">Your Shopping Cart</h3>
-        <button id="close-cart-btn" style="background: none; border: none; font-size: 18px; cursor: pointer;">✕</button>
+    <div class="row-2">
+      <div class="form-group">
+        <label for="store-slogan-input">Store Tagline / Slogan</label>
+        <input type="text" id="store-slogan-input" placeholder="e.g. Premium quality products">
       </div>
-      
-      <div id="cart-items-container" style="flex: 1; overflow-y: auto; margin-bottom: 16px;"></div>
-
-      <div style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: auto;">
-        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; margin-bottom: 12px;">
-          <span>Total:</span>
-          <span id="cart-total-price">KSh 0</span>
+      <div class="form-group">
+        <label for="store-theme-color">Brand Theme Color</label>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="color" id="store-theme-color" value="#10b981" style="height: 40px; width: 60px; padding: 2px; border-radius: 6px; cursor: pointer;">
+          <span id="color-hex-label" style="font-size: 13px; font-weight: 600; color: #64748b;">#10b981</span>
         </div>
-        <button id="checkout-whatsapp-btn" style="width: 100%; background: #25d366; color: #ffffff; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px;">
-          📲 Order via WhatsApp
-        </button>
+      </div>
+    </div>
+
+    <!-- Merchant Store-Wide Preset Sizes List -->
+    <div class="form-group">
+      <label>Store-Wide Available Sizes / Variants (Used in product dropdowns)</label>
+      <div id="store-sizes-tags-list" class="cat-tags-container"></div>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <input type="text" id="new-store-size-input" placeholder="e.g. 30ml, 100ml, XL, 1kg..." style="max-width: 250px;">
+        <button id="add-store-size-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">+ Add Size Option</button>
+      </div>
+    </div>
+
+    <div class="form-group" style="margin-bottom: 0;">
+      <label>Store Logo</label>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <img id="logo-preview-img" src="https://placehold.co/100x100?text=Logo" alt="Logo Preview" class="preview-thumb">
+        <input type="file" id="store-logo-file" accept="image/*" style="font-size: 13px;">
       </div>
     </div>
   </div>
 
-  <script src="app.js"></script>
+  <!-- PRODUCT EDITING / CREATION CARD -->
+  <div class="card">
+    <div class="card-title">📦 Add / Edit Catalog Item</div>
+
+    <div class="row-2">
+      <div class="form-group">
+        <label for="prod-name">Product Name</label>
+        <input type="text" id="prod-name" placeholder="e.g. Sauvage, T-Shirt, Coffee">
+      </div>
+      <div class="form-group">
+        <label for="prod-stock">Stock Availability</label>
+        <select id="prod-stock">
+          <option value="instock">In Stock</option>
+          <option value="outstock">Out of Stock</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Category Tag Selection -->
+    <div class="form-group">
+      <label>Categories (Click tags to assign to product)</label>
+      <div id="category-tags-list" class="cat-tags-container"></div>
+      <div style="display: flex; gap: 8px; margin-top: 10px;">
+        <input type="text" id="prod-new-category-input" placeholder="New category name..." style="max-width: 250px;">
+        <button id="add-category-tag-btn" type="button" class="btn btn-secondary" style="padding: 6px 12px; font-size: 13px;">+ Add Category Tag</button>
+      </div>
+    </div>
+
+    <!-- Product Size Options & Pricing -->
+    <div class="form-group">
+      <label>Size Options & Prices (KSh)</label>
+      <div id="variants-container"></div>
+      <button id="add-variant-btn" type="button" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; margin-top: 4px;">+ Add Option Row</button>
+    </div>
+
+    <!-- Product Image -->
+    <div class="form-group">
+      <label>Product Image</label>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <img id="prod-preview-img" src="https://placehold.co/100x100?text=Product" alt="Product Preview" class="preview-thumb">
+        <input type="file" id="prod-img-file" accept="image/*" style="font-size: 13px;">
+      </div>
+    </div>
+
+    <button id="add-prod-btn" type="button" class="btn btn-secondary" style="width: 100%; margin-top: 10px;">+ Add Product to List</button>
+  </div>
+
+  <!-- CURRENT PRODUCTS CATALOG LIST -->
+  <div class="card">
+    <div class="card-title">
+      <span>📋 Current Product Catalog (<span id="prod-count">0</span>)</span>
+      <button id="sync-cloud-btn" type="button" class="btn btn-success">🚀 Publish All Changes to Cloud</button>
+    </div>
+
+    <div id="product-list-container">
+      <p style="text-align: center; color: #94a3b8; padding: 20px 0; font-size: 13px;">No items in catalog yet.</p>
+    </div>
+  </div>
+
+</div>
+
+<script src="dashboard.js"></script>
 </body>
 </html>
