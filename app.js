@@ -111,7 +111,7 @@ function renderCartModal() {
     <div class="cart-item">
       <div>
         <strong>${item.productName}</strong><br>
-        <span style="font-size:12px; color:#6c757d;">${item.variantSize} - KSh ${item.price} each</span>
+        <span style="font-size:12px; color:#6c757d;">Variant: ${item.variantSize} - KSh ${item.price.toLocaleString()} each</span>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
         <button class="qty-btn" onclick="updateQty(${i}, -1)">-</button>
@@ -148,7 +148,6 @@ function renderStorefront() {
 
   if (!storeData || !gridEl) return;
 
-  // Render Categories
   const categories = ["ALL", ...(storeData.categories || [])];
   if (catBar) {
     catBar.innerHTML = categories.map(c => `
@@ -156,7 +155,6 @@ function renderStorefront() {
     `).join("");
   }
 
-  // Multi-Category Filter
   const products = (storeData.products || []).filter(p => {
     if (selectedCategory === "ALL") return true;
     if (Array.isArray(p.categories)) return p.categories.includes(selectedCategory);
@@ -180,7 +178,7 @@ function renderStorefront() {
           
           ${hasVariants ? `
             <select id="variant-select-${idx}" class="price-select">
-              ${variants.map(v => `<option value="${v.size}|${v.price}">${v.size} - KSh ${v.price}</option>`).join("")}
+              ${variants.map(v => `<option value="${v.size}|${v.price}">${v.size} - KSh ${v.price.toLocaleString()}</option>`).join("")}
             </select>
           ` : `<div style="font-weight:bold; color:#27ae60; margin:8px 0; font-size:13px;">Contact for Price</div>`}
         </div>
