@@ -2,277 +2,243 @@
   const PROJECT_ID = "whatsapp-eco-engine-80882";
   const DEFAULT_STORE_ID = "perfumescentre";
 
-  // Parse store key safely from URL query parameter
-  const urlParams = new URLSearchParams(window.location.search);
-  const rawStoreParam = urlParams.get("store");
-  const storeId = (rawStoreParam || DEFAULT_STORE_ID).trim().toLowerCase().replace(/[^a-z0-9_-]/g, "") || DEFAULT_STORE_ID;
-
-  let storeData = null;
+  let currentStoreId = "";
+  let storePhone = "";
+  let products = [];
   let cart = [];
   let activeCategory = "All";
 
   const getEl = (id) => document.getElementById(id);
 
-  function extractNumber(fieldObj, fallback = 0) {
-    if (!fieldObj) return fallback;
-    if (fieldObj.doubleValue !== undefined) return Number(fieldObj.doubleValue);
-    if (fieldObj.integerValue !== undefined) return Number(fieldObj.integerValue);
-    if (fieldObj.stringValue !== undefined) return Number(fieldObj.stringValue) || fallback;
-    return fallback;
+  function getQueryParam(param) {
+    const urlParams = new URLSearchParams(window.location.search);
+    return urlParams.get(param);
   }
 
-  function extractString(fieldObj, fallback = "") {
-    if (!fieldObj) return fallback;
-    if (fieldObj.stringValue !== undefined) return String(fieldObj.stringValue);
-    if (fieldObj.integerValue !== undefined) return String(fieldObj.integerValue);
-    if (fieldObj.doubleValue !== undefined) return String(fieldObj.doubleValue);
-    return fallback;
+  function formatCurrency(amount) {
+    return "KSh " + Number(amount).toLocaleString();
   }
 
-  function getItemPrice(item, variantIndex = 0) {
-    if (item.variants && item.variants[variantIndex]) {
-      return Number(item.variants[variantIndex].price || 0);
-    }
-    return Number(item.price || 0);
+  function initStorefront() {
+    currentStoreId = getQueryParam("store") || DEFAULT_STORE_ID;
+    fetchStoreData(currentStoreId);
   }
 
-  function loadStoreData() {
-    const catalogGrid = getEl("catalog-grid");
-    if (catalogGrid) {
-      catalogGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #64748b; padding: 40px;">⏳ Loading store catalog...</p>`;
-    }
+  function fetchStoreData(storeId) {
+    const statusText = getEl("store-status-text");
+    if (statusText) statusText.innerText = "Loading store data...";
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/stores/${storeId}`;
 
     fetch(firestoreUrl)
       .then((res) => {
         if (res.status === 404) {
-          throw new Error(`Store document "${storeId}" was not found in database. Open dashboard and click "Publish All Changes".`);
+          throw new Error(`Store "${storeId}" was not found or has not been published yet.`);
         }
-        if (!res.ok) {
-          throw new Error(`Cloud connection failed with HTTP status ${res.status}.`);
-        }
+        if (!res.ok) throw new Error(`Failed to load store (HTTP ${res.status}).`);
         return res.json();
       })
       .then((doc) => {
-        if (!doc || !doc.fields) {
-          throw new Error(`Store dataset for "${storeId}" is currently empty.`);
-        }
+        if (!doc || !doc.fields) throw new Error("Store data is empty.");
 
-        const fields = doc.fields || {};
+        const fields = doc.fields;
+
+        storePhone = fields.phone?.stringValue || "";
+        const slogan = fields.slogan?.stringValue || "";
+        const themeColor = fields.themeColor?.stringValue || "#10b981";
+        const logoUrl = fields.logo?.stringValue || "https://placehold.co/100x100?text=Logo";
+
+        // Apply branding
+        document.documentElement.style.setProperty("--primary", themeColor);
+        const logoImg = getEl("store-logo");
+        if (logoImg) logoImg.src = logoUrl;
+
+        const sloganEl = getEl("store-slogan");
+        if (sloganEl) sloganEl.innerText = slogan;
+
+        const storeTitleEl = getEl("store-title");
+        if (storeTitleEl) storeTitleEl.innerText = storeId.toUpperCase();
+
+        // Parse Items
         const rawItems = fields.items?.arrayValue?.values || [];
 
-        const parsedItems = rawItems.map((item, index) => {
+        products = rawItems.map((item) => {
           const f = item.mapValue?.fields || {};
 
-          let cats = [];
+          let categories = [];
           if (f.categories?.arrayValue?.values) {
-            cats = f.categories.arrayValue.values
-              .map((v) => extractString(v))
-              .filter(Boolean);
-          } else if (f.category) {
-            const singleCat = extractString(f.category);
-            if (singleCat) cats = [singleCat];
+            categories = f.categories.arrayValue.values.map(v => v.stringValue).filter(Boolean);
+          } else if (f.category?.stringValue) {
+            categories = [f.category.stringValue];
           }
 
-          let variantsList = [];
+          let variants = [];
           if (f.variants?.arrayValue?.values) {
-            variantsList = f.variants.arrayValue.values.map((v) => {
+            variants = f.variants.arrayValue.values.map((v) => {
               const vf = v.mapValue?.fields || {};
               return {
-                size: extractString(vf.size, "Standard"),
-                price: extractNumber(vf.price, 0)
+                size: vf.size?.stringValue || "Standard",
+                price: Number(vf.price?.doubleValue || vf.price?.integerValue || 0)
               };
             });
           }
 
-          const fallbackPrice = extractNumber(f.price, 0);
-          if (variantsList.length === 0) {
-            variantsList = [{ size: "Standard", price: fallbackPrice }];
+          if (variants.length === 0) {
+            const fallbackPrice = Number(f.price?.doubleValue || f.price?.integerValue || 0);
+            variants = [{ size: "Standard", price: fallbackPrice }];
           }
 
           return {
-            id: index,
-            name: extractString(f.name, `Product ${index + 1}`),
-            price: fallbackPrice || variantsList[0].price,
-            categories: cats.length ? cats : ["General"],
-            variants: variantsList,
-            stock: extractString(f.stock, "instock"),
-            img: extractString(f.img, "https://placehold.co/200x200?text=Product")
+            name: f.name?.stringValue || "Untitled Product",
+            categories: categories.length ? categories : ["General"],
+            variants: variants,
+            stock: f.stock?.stringValue || "instock",
+            img: f.img?.stringValue || "https://placehold.co/150x150?text=Product"
           };
         });
 
-        storeData = {
-          phone: extractString(fields.phone, ""),
-          slogan: extractString(fields.slogan, "Welcome to our store"),
-          themeColor: extractString(fields.themeColor, "#10b981"),
-          logo: extractString(fields.logo, ""),
-          items: parsedItems
-        };
-
-        applyThemeAndHeader();
-        renderCategoriesMenu();
+        renderCategoryBar();
         renderProducts();
-        updateCartUI();
+        if (statusText) statusText.innerText = "";
       })
       .catch((err) => {
-        console.error("[STOREFRONT ERROR]:", err);
-        if (catalogGrid) {
-          catalogGrid.innerHTML = `
-            <div style="grid-column: 1/-1; text-align: center; color: #dc2626; background: #fee2e2; border: 1px solid #fecaca; border-radius: 8px; padding: 24px; margin: 20px 0;">
-              <h4 style="font-weight: 700; margin-bottom: 8px;">Unable to Load Store</h4>
-              <p style="font-size: 13px;">${err.message}</p>
+        console.error(err);
+        const catalogContainer = getEl("product-catalog");
+        if (catalogContainer) {
+          catalogContainer.innerHTML = `
+            <div style="text-align: center; padding: 40px 20px; color: #ef4444;">
+              <h3>Store Unavailable</h3>
+              <p style="color: #64748b; margin-top: 8px;">${err.message}</p>
             </div>
           `;
         }
       });
   }
 
-  function applyThemeAndHeader() {
-    if (!storeData) return;
-    document.documentElement.style.setProperty("--primary-color", storeData.themeColor);
+  function renderCategoryBar() {
+    const navContainer = getEl("category-nav");
+    if (!navContainer) return;
 
-    const sloganEl = getEl("store-slogan");
-    if (sloganEl) sloganEl.innerText = storeData.slogan;
-
-    const logoEl = getEl("store-logo");
-    if (logoEl && storeData.logo) logoEl.src = storeData.logo;
-  }
-
-  function renderCategoriesMenu() {
-    const nav = getEl("category-nav");
-    if (!nav || !storeData) return;
-
-    const allCats = new Set(["All"]);
-    storeData.items.forEach((item) => {
-      item.categories.forEach((c) => allCats.add(c));
+    const categoriesSet = new Set(["All"]);
+    products.forEach(p => {
+      p.categories.forEach(c => categoriesSet.add(c));
     });
 
-    nav.innerHTML = "";
-    allCats.forEach((cat) => {
+    const categories = Array.from(categoriesSet);
+    navContainer.innerHTML = "";
+
+    categories.forEach(cat => {
       const btn = document.createElement("button");
-      btn.className = `cat-filter-btn ${cat === activeCategory ? "active" : ""}`;
+      btn.className = `cat-chip ${cat === activeCategory ? "active" : ""}`;
       btn.innerText = cat;
       btn.addEventListener("click", () => {
         activeCategory = cat;
-        renderCategoriesMenu();
+        renderCategoryBar();
         renderProducts();
       });
-      nav.appendChild(btn);
+      navContainer.appendChild(btn);
     });
   }
 
   function renderProducts() {
-    const grid = getEl("catalog-grid");
-    if (!grid || !storeData) return;
-    grid.innerHTML = "";
+    const catalogContainer = getEl("product-catalog");
+    if (!catalogContainer) return;
+    catalogContainer.innerHTML = "";
 
-    const filteredItems = storeData.items.filter((item) => {
+    const filtered = products.filter(p => {
       if (activeCategory === "All") return true;
-      return item.categories.includes(activeCategory);
+      return p.categories.includes(activeCategory);
     });
 
-    if (filteredItems.length === 0) {
-      grid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #94a3b8; padding: 40px;">No products found in this category.</p>`;
+    if (filtered.length === 0) {
+      catalogContainer.innerHTML = `<p style="text-align: center; color: #94a3b8; grid-column: 1 / -1; padding: 40px 0;">No products in this category.</p>`;
       return;
     }
 
-    filteredItems.forEach((item) => {
+    filtered.forEach((p, idx) => {
       const card = document.createElement("div");
-      card.className = "product-card";
+      card.className = "prod-card";
 
-      let variantOptionsHTML = item.variants.map((v, idx) => 
-        `<option value="${idx}">${v.size} - KSh ${v.price.toLocaleString()}</option>`
-      ).join("");
+      const primaryVariant = p.variants[0] || { size: "Standard", price: 0 };
+      const isOutOfStock = p.stock === "out-of-stock";
+
+      let optionsHTML = p.variants.map((v, vIdx) => {
+        return `<option value="${vIdx}">${v.size} - ${formatCurrency(v.price)}</option>`;
+      }).join("");
 
       card.innerHTML = `
-        <img src="${item.img}" alt="${item.name}" class="product-img" onerror="this.src='https://placehold.co/200x200?text=Product';">
-        <div class="product-details">
-          <h3 class="product-title" style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">${item.name}</h3>
-          <p class="product-cats" style="font-size: 11px; color: #64748b; margin-bottom: 8px;">${item.categories.join(", ")}</p>
+        <div style="position: relative;">
+          <img src="${p.img}" alt="${p.name}" onerror="this.src='https://placehold.co/150x150?text=Product';" class="prod-img">
+          ${isOutOfStock ? `<span class="badge-out">Out of Stock</span>` : ""}
+        </div>
+        <div class="prod-details">
+          <div class="prod-title">${p.name}</div>
+          <div class="prod-cat">${p.categories.join(", ")}</div>
           
-          <div style="margin: 8px 0;">
-            <select class="variant-dropdown" data-id="${item.id}" style="width: 100%; padding: 6px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 13px; background: #fff;">
-              ${variantOptionsHTML}
-            </select>
+          <div style="margin-top: 12px;">
+            ${p.variants.length > 1 ? `
+              <select class="variant-select" id="variant-select-${idx}" style="width: 100%; padding: 6px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 12px; margin-bottom: 8px;">
+                ${optionsHTML}
+              </select>
+            ` : `
+              <div class="prod-price" id="price-display-${idx}">${formatCurrency(primaryVariant.price)}</div>
+            `}
           </div>
 
-          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px;">
-            <span class="product-price" id="price-display-${item.id}" style="font-weight: 700; color: #0f172a; font-size: 14px;">
-              KSh ${getItemPrice(item, 0).toLocaleString()}
-            </span>
-            <button type="button" class="add-to-cart-btn" data-id="${item.id}" style="background: var(--primary-color, #10b981); color: #fff; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 13px;">
-              + Add
-            </button>
-          </div>
+          <button class="add-to-cart-btn" data-prod-index="${idx}" ${isOutOfStock ? "disabled" : ""}>
+            ${isOutOfStock ? "Out of Stock" : "Add to Cart 🛒"}
+          </button>
         </div>
       `;
 
-      grid.appendChild(card);
+      catalogContainer.appendChild(card);
 
-      const dropdown = card.querySelector(`.variant-dropdown`);
-      if (dropdown) {
-        dropdown.addEventListener("change", (e) => {
-          const vIdx = Number(e.target.value);
-          const priceLabel = getEl(`price-display-${item.id}`);
-          if (priceLabel) {
-            priceLabel.innerText = `KSh ${getItemPrice(item, vIdx).toLocaleString()}`;
-          }
+      const variantSelect = card.querySelector(`#variant-select-${idx}`);
+      if (variantSelect) {
+        variantSelect.addEventListener("change", (e) => {
+          const selectedVariant = p.variants[e.target.value];
+          const priceDisplay = card.querySelector(`#price-display-${idx}`);
+          if (priceDisplay) priceDisplay.innerText = formatCurrency(selectedVariant.price);
         });
       }
 
-      const addBtn = card.querySelector(".add-to-cart-btn");
-      if (addBtn) {
-        addBtn.addEventListener("click", () => {
-          const selectedVariantIdx = dropdown ? Number(dropdown.value) : 0;
-          addToCart(item, selectedVariantIdx);
+      const addToCartBtn = card.querySelector(".add-to-cart-btn");
+      if (addToCartBtn && !isOutOfStock) {
+        addToCartBtn.addEventListener("click", () => {
+          const vIdx = variantSelect ? Number(variantSelect.value) : 0;
+          const chosenVariant = p.variants[vIdx] || primaryVariant;
+          addToCart(p, chosenVariant);
         });
       }
     });
   }
 
-  function addToCart(product, variantIndex) {
-    const variant = product.variants[variantIndex] || { size: "Standard", price: product.price };
-    
-    const existingIndex = cart.findIndex(
-      (c) => c.product.id === product.id && c.selectedSize === variant.size
-    );
-
-    if (existingIndex > -1) {
-      cart[existingIndex].qty += 1;
+  function addToCart(product, variant) {
+    const existing = cart.find(item => item.name === product.name && item.size === variant.size);
+    if (existing) {
+      existing.qty += 1;
     } else {
       cart.push({
-        product: product,
-        variantIndex: variantIndex,
-        selectedSize: variant.size,
-        selectedPrice: Number(variant.price || 0),
+        name: product.name,
+        size: variant.size,
+        price: variant.price,
         qty: 1
       });
     }
-
-    updateCartUI();
-    openCartModal();
+    renderCart();
   }
 
-  function updateCartQuantity(index, delta) {
-    if (!cart[index]) return;
-    cart[index].qty += delta;
-    if (cart[index].qty <= 0) {
-      cart.splice(index, 1);
-    }
-    updateCartUI();
-  }
+  function renderCart() {
+    const cartCountEl = getEl("cart-count");
+    const cartDrawer = getEl("cart-drawer");
+    const cartItemsContainer = getEl("cart-items");
+    const cartTotalEl = getEl("cart-total");
 
-  function updateCartUI() {
-    const cartCountLabel = getEl("cart-count");
-    const cartItemsContainer = getEl("cart-items-container");
-    const cartTotalLabel = getEl("cart-total-price");
+    const totalQty = cart.reduce((sum, item) => sum + item.qty, 0);
+    const totalPrice = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
-    const totalCount = cart.reduce((sum, item) => sum + item.qty, 0);
-    const totalPrice = cart.reduce((sum, item) => sum + (item.selectedPrice * item.qty), 0);
-
-    if (cartCountLabel) cartCountLabel.innerText = totalCount;
-    if (cartTotalLabel) cartTotalLabel.innerText = `KSh ${totalPrice.toLocaleString()}`;
+    if (cartCountEl) cartCountEl.innerText = totalQty;
+    if (cartTotalEl) cartTotalEl.innerText = formatCurrency(totalPrice);
 
     if (!cartItemsContainer) return;
     cartItemsContainer.innerHTML = "";
@@ -283,88 +249,63 @@
     }
 
     cart.forEach((item, index) => {
-      const itemSubtotal = item.selectedPrice * item.qty;
       const row = document.createElement("div");
-      row.className = "cart-item-row";
-      row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f1f5f9;";
-
+      row.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e2e8f0;";
       row.innerHTML = `
-        <div style="flex: 1; padding-right: 8px;">
-          <div style="font-weight: 600; font-size: 14px;">${item.product.name}</div>
-          <div style="font-size: 12px; color: #64748b;">${item.selectedSize} • KSh ${item.selectedPrice.toLocaleString()}</div>
+        <div>
+          <div style="font-size: 13px; font-weight: 600;">${item.name}</div>
+          <div style="font-size: 11px; color: #64748b;">${item.size} • ${formatCurrency(item.price)}</div>
         </div>
         <div style="display: flex; align-items: center; gap: 8px;">
-          <button type="button" class="qty-btn minus" data-index="${index}" style="width: 26px; height: 26px; border-radius: 4px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">-</button>
-          <span style="font-size: 14px; font-weight: 600;">${item.qty}</span>
-          <button type="button" class="qty-btn plus" data-index="${index}" style="width: 26px; height: 26px; border-radius: 4px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer;">+</button>
-        </div>
-        <div style="font-weight: 700; font-size: 14px; min-width: 80px; text-align: right; color: #0f172a;">
-          KSh ${itemSubtotal.toLocaleString()}
+          <button class="cart-qty-btn" data-action="dec" data-idx="${index}">-</button>
+          <span style="font-size: 13px; font-weight: 600;">${item.qty}</span>
+          <button class="cart-qty-btn" data-action="inc" data-idx="${index}">+</button>
         </div>
       `;
-
       cartItemsContainer.appendChild(row);
     });
 
-    cartItemsContainer.querySelectorAll(".qty-btn.minus").forEach((btn) => {
+    cartItemsContainer.querySelectorAll(".cart-qty-btn").forEach(btn => {
       btn.addEventListener("click", (e) => {
-        const idx = Number(e.currentTarget.getAttribute("data-index"));
-        updateCartQuantity(idx, -1);
-      });
-    });
+        const idx = Number(e.target.getAttribute("data-idx"));
+        const action = e.target.getAttribute("data-action");
 
-    cartItemsContainer.querySelectorAll(".qty-btn.plus").forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        const idx = Number(e.currentTarget.getAttribute("data-index"));
-        updateCartQuantity(idx, 1);
+        if (action === "inc") {
+          cart[idx].qty += 1;
+        } else if (action === "dec") {
+          cart[idx].qty -= 1;
+          if (cart[idx].qty <= 0) cart.splice(idx, 1);
+        }
+        renderCart();
       });
     });
   }
 
-  function sendWhatsAppOrder() {
+  function checkoutToWhatsApp() {
     if (cart.length === 0) return alert("Your cart is empty!");
+    if (!storePhone) return alert("Store phone number is not configured.");
 
-    const phone = storeData?.phone || "";
-    if (!phone) return alert("Store phone number is missing in dashboard settings.");
+    let cleanPhone = storePhone.replace(/[^0-9]/g, "");
+    let text = `*New Order - ${currentStoreId.toUpperCase()}*\n\n`;
 
-    let message = `🛒 *NEW ORDER - ${storeData?.slogan || "Store"}*\n\n`;
-    let grandTotal = 0;
-
+    let total = 0;
     cart.forEach((item, i) => {
-      const subtotal = item.selectedPrice * item.qty;
-      grandTotal += subtotal;
-      message += `${i + 1}. *${item.product.name}* (${item.selectedSize})\n`;
-      message += `   Qty: ${item.qty} × KSh ${item.selectedPrice.toLocaleString()} = *KSh ${subtotal.toLocaleString()}*\n\n`;
+      const itemTotal = item.price * item.qty;
+      total += itemTotal;
+      text += `${i + 1}. *${item.name}* (${item.size})\n   Qty: ${item.qty} x ${formatCurrency(item.price)} = *${formatCurrency(itemTotal)}*\n`;
     });
 
-    message += `------------------------------\n`;
-    message += `💰 *TOTAL AMOUNT:* KSh ${grandTotal.toLocaleString()}\n\n`;
-    message += `Please confirm my order and share payment details.`;
+    text += `\n*Total Order Value: ${formatCurrency(total)}*`;
 
-    const cleanPhone = phone.replace(/[^0-9]/g, "");
-    window.open(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`, "_blank");
-  }
-
-  function openCartModal() {
-    const modal = getEl("cart-modal");
-    if (modal) modal.style.display = "flex";
-  }
-
-  function closeCartModal() {
-    const modal = getEl("cart-modal");
-    if (modal) modal.style.display = "none";
+    const encodedText = encodeURIComponent(text);
+    const waUrl = `https://wa.me/${cleanPhone}?text=${encodedText}`;
+    window.open(waUrl, "_blank");
   }
 
   window.addEventListener("DOMContentLoaded", () => {
-    loadStoreData();
+    initStorefront();
 
-    const openCartBtn = getEl("open-cart-btn");
-    if (openCartBtn) openCartBtn.addEventListener("click", openCartModal);
-
-    const closeCartBtn = getEl("close-cart-btn");
-    if (closeCartBtn) closeCartBtn.addEventListener("click", closeCartModal);
-
-    const checkoutBtn = getEl("checkout-whatsapp-btn");
-    if (checkoutBtn) checkoutBtn.addEventListener("click", sendWhatsAppOrder);
+    const checkoutBtn = getEl("whatsapp-checkout-btn");
+    if (checkoutBtn) checkoutBtn.addEventListener("click", checkoutToWhatsApp);
   });
 })();
