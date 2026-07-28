@@ -3,177 +3,95 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Merchant Admin Dashboard</title>
+  <title>Store Dashboard</title>
   <style>
-    :root {
-      --primary: #10b981;
-      --primary-dark: #059669;
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --text: #0f172a;
-      --muted: #64748b;
-      --border: #e2e8f0;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 20px; }
-    .container { max-width: 800px; margin: 0 auto; }
-
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
-    h1 { font-size: 24px; font-weight: 700; color: var(--text); }
-
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-    .card-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; color: var(--text); display: flex; align-items: center; justify-content: space-between; }
-
-    .form-group { margin-bottom: 16px; }
-    label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: #334155; }
-    input[type="text"], input[type="number"], select { width: 100%; padding: 10px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; background: #fff; }
-    input[type="file"] { font-size: 13px; }
-
-    .btn { display: inline-flex; align-items: center; justify-content: center; padding: 10px 16px; font-size: 14px; font-weight: 600; border-radius: 6px; border: none; cursor: pointer; text-decoration: none; gap: 6px; transition: background 0.2s; }
-    .btn-primary { background: var(--primary); color: #fff; }
-    .btn-primary:hover { background: var(--primary-dark); }
-    .btn-secondary { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
-    .btn-secondary:hover { background: #bae6fd; }
-
-    /* Category & Size Tags */
-    .tag-container { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-    .cat-tag { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 20px; font-size: 12px; font-weight: 600; color: #334155; cursor: pointer; user-select: none; }
-    .cat-tag.selected { background: #dcfce7; color: #166534; border-color: #86efac; }
-    .remove-cat-x { margin-left: 4px; font-size: 12px; color: #ef4444; }
-
-    /* Store Banner & Status Bar */
-    #store-link-banner { display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; align-items: center; justify-content: space-between; gap: 12px; }
-    #status-msg { display: none; padding: 12px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 14px; font-weight: 500; border: 1px solid transparent; }
-
-    .img-preview { width: 64px; height: 64px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); background: #f1f5f9; margin-top: 8px; }
-    .badge-instock { background: #dcfce7; color: #166534; }
-    .badge-out-of-stock { background: #fee2e2; color: #991b1b; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #f8f9fa; color: #333; }
+    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .banner { display: flex; align-items: center; justify-content: space-between; background: #eef2f7; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; }
+    .btn { background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-weight: bold; }
+    .btn:hover { background: #0056b3; }
+    .btn-success { background: #28a745; }
+    .btn-danger { background: #dc3545; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; font-weight: bold; margin-bottom: 5px; }
+    input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+    th { background: #f1f1f1; }
   </style>
+  <script src="dashboard.js?v=200" defer></script>
 </head>
 <body>
-
   <div class="container">
-    <header>
-      <h1>Merchant Dashboard</h1>
-      <button id="sync-cloud-btn" class="btn btn-primary">🚀 Publish All Changes</button>
-    </header>
-
-    <!-- Status Message -->
-    <div id="status-msg"></div>
-
-    <!-- Live Store URL Banner -->
-    <div id="store-link-banner">
+    <h2>Merchant Dashboard</h2>
+    
+    <!-- Store Banner -->
+    <div id="store-link-banner" class="banner" style="display:none;">
       <div>
-        <span style="font-size: 12px; color: #166534; font-weight: 600; display: block;">YOUR LIVE STORE URL:</span>
-        <span id="store-url-text" style="font-size: 13px; font-weight: 500; color: #0f172a; word-break: break-all;"></span>
+        <strong>Storefront URL:</strong> <span id="store-url-text" style="font-family: monospace;">Loading...</span>
       </div>
-      <a id="visit-store-btn" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-secondary">Visit Store ↗</a>
+      <a id="visit-store-btn" class="btn btn-success" href="#" target="_blank">Visit Store ↗</a>
     </div>
 
-    <!-- Store Config -->
-    <div class="card">
-      <div class="card-title">Store Configuration</div>
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-        <div class="form-group">
-          <label for="store-id-input">Store ID (URL Slug)</label>
-          <input type="text" id="store-id-input" placeholder="perfumescentre">
-        </div>
-        <div class="form-group">
-          <label for="store-phone-input">WhatsApp Phone Number</label>
-          <input type="text" id="store-phone-input" placeholder="254700000000">
-        </div>
-      </div>
-
+    <!-- Store Settings -->
+    <fieldset style="border:1px solid #ccc; padding: 15px; border-radius:6px; margin-bottom:20px;">
+      <legend><strong>Store Settings</strong></legend>
       <div class="form-group">
-        <label for="store-slogan-input">Store Slogan / Header Note</label>
-        <input type="text" id="store-slogan-input" placeholder="Premium Fragrances Delivered to Your Door">
+        <label for="store-name-input">Store Name</label>
+        <input type="text" id="store-name-input" placeholder="e.g. Aromatic Vibes">
       </div>
-
-      <div style="display: flex; gap: 16px; align-items: center; margin-top: 8px;">
-        <div class="form-group" style="margin-bottom: 0;">
-          <label for="store-theme-color">Theme Color</label>
-          <div style="display: flex; align-items: center; gap: 8px;">
-            <input type="color" id="store-theme-color" value="#10b981" style="width: 40px; height: 38px; border: none; cursor: pointer; background: none;">
-            <span id="color-hex-label" style="font-size: 13px; font-weight: 600;">#10b981</span>
-          </div>
-        </div>
-        <div class="form-group" style="margin-bottom: 0; flex: 1;">
-          <label for="store-logo-file">Store Logo</label>
-          <input type="file" id="store-logo-file" accept="image/*">
-        </div>
-        <img id="logo-preview-img" class="img-preview" src="https://placehold.co/100x100?text=Logo" alt="Logo Preview">
-      </div>
-
-      <div style="margin-top: 16px;">
-        <button id="fetch-cloud-btn" class="btn btn-secondary" style="width: 100%;">🔄 Reload Data from Cloud</button>
-      </div>
-    </div>
-
-    <!-- Store Sizes Manager -->
-    <div class="card">
-      <div class="card-title">Global Preset Sizes</div>
       <div class="form-group">
-        <div style="display: flex; gap: 8px;">
-          <input type="text" id="new-store-size-input" placeholder="Add size (e.g., 250ml, 30ml)">
-          <button type="button" id="add-store-size-btn" class="btn btn-secondary">+ Add Size</button>
-        </div>
-        <div id="store-sizes-tags-list" class="tag-container" style="margin-top: 12px;"></div>
+        <label for="store-phone-input">WhatsApp Phone Number (with Country Code)</label>
+        <input type="text" id="store-phone-input" placeholder="e.g. 254700000000">
       </div>
-    </div>
+      <button class="btn btn-success" onclick="saveStoreConfig()">Publish Store Settings</button>
+    </fieldset>
 
-    <!-- Add / Edit Product Form -->
-    <div class="card">
-      <div class="card-title">Manage Product Form</div>
+    <!-- Category Management -->
+    <fieldset style="border:1px solid #ccc; padding: 15px; border-radius:6px; margin-bottom:20px;">
+      <legend><strong>Categories</strong></legend>
+      <div style="display:flex; gap:10px;">
+        <input type="text" id="new-category-input" placeholder="New Category Name">
+        <button class="btn" onclick="addCategory()">Add Category</button>
+      </div>
+      <ul id="category-list" style="margin-top:10px; padding-left:20px;"></ul>
+    </fieldset>
+
+    <!-- Product Management -->
+    <fieldset style="border:1px solid #ccc; padding: 15px; border-radius:6px;">
+      <legend><strong>Add Product</strong></legend>
       <div class="form-group">
         <label for="prod-name">Product Name</label>
-        <input type="text" id="prod-name" placeholder="e.g., Sauvage Dior Eau De Parfum">
+        <input type="text" id="prod-name">
       </div>
-
       <div class="form-group">
-        <label>Categories (Click to select multiple)</label>
-        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
-          <input type="text" id="prod-new-category-input" placeholder="Create new category">
-          <button type="button" id="add-category-tag-btn" class="btn btn-secondary">+ Add</button>
-        </div>
-        <div id="category-tags-list" class="tag-container"></div>
+        <label for="product-category-select">Category</label>
+        <select id="product-category-select"></select>
       </div>
-
       <div class="form-group">
-        <label>Size Variants & Prices</label>
-        <div id="variants-container"></div>
-        <button type="button" id="add-variant-btn" class="btn btn-secondary" style="font-size: 12px; padding: 6px 12px; margin-top: 4px;">+ Add Size Variant</button>
+        <label for="prod-price">Price (KSh)</label>
+        <input type="number" id="prod-price" placeholder="0">
       </div>
+      <div class="form-group">
+        <label for="prod-image">Image</label>
+        <input type="file" id="prod-image" accept="image/*">
+      </div>
+      <button class="btn" onclick="addProduct()">Add Product</button>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: flex-end;">
-        <div class="form-group">
-          <label for="prod-stock">Stock Availability</label>
-          <select id="prod-stock">
-            <option value="instock">In Stock</option>
-            <option value="out-of-stock">Out of Stock</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="prod-img-file">Product Image</label>
-          <input type="file" id="prod-img-file" accept="image/*">
-        </div>
-      </div>
-      <img id="prod-preview-img" class="img-preview" src="https://placehold.co/100x100?text=Product" alt="Product Image Preview">
-
-      <div style="margin-top: 16px;">
-        <button type="button" id="add-prod-btn" class="btn btn-secondary" style="width: 100%;">+ Add Product to List</button>
-      </div>
-    </div>
-
-    <!-- Catalog List -->
-    <div class="card">
-      <div class="card-title">
-        <span>Catalog Products (<span id="prod-count">0</span>)</span>
-      </div>
-      <div id="product-list-container"></div>
-    </div>
+      <h3>Product Catalog</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Image</th>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Price</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="products-table-body"></tbody>
+      </table>
+    </fieldset>
   </div>
-
-  <script src="dashboard.js"></script>
 </body>
 </html>
