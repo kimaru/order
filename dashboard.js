@@ -27,7 +27,6 @@ function updateStoreLinkBanner(storeId) {
   banner.style.display = "flex";
 }
 
-// Canvas Compression: Max 600px width/height, 0.6 JPEG quality
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -154,7 +153,10 @@ function renderProducts() {
           <td>${cats}</td>
           <td>${variantStr}</td>
           <td><span style="color:${p.inStock ? 'green' : 'red'}; font-weight:bold;">${p.inStock ? 'In Stock' : 'Out of Stock'}</span></td>
-          <td><button class="btn btn-danger btn-sm" onclick="deleteProduct(${i})">Delete</button></td>
+          <td>
+            <button class="btn btn-warning btn-sm" onclick="editProduct(${i})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="deleteProduct(${i})">Delete</button>
+          </td>
         </tr>
       `;
     }).join("");
@@ -175,32 +177,75 @@ window.deleteCategory = function(i) {
   renderCategories();
 };
 
-window.addVariantRow = function() {
+window.addVariantRow = function(size = "", price = "") {
   const container = getEl("variants-container");
   if (!container) return;
   const div = document.createElement("div");
   div.className = "variant-row";
   div.innerHTML = `
-    <input type="text" placeholder="Size (e.g. 100ml)" class="variant-size" style="flex:1;">
-    <input type="number" placeholder="Price (KSh)" class="variant-price" style="flex:1;">
+    <input type="text" placeholder="Size (e.g. 100ml)" class="variant-size" value="${size}" style="flex:1;">
+    <input type="number" placeholder="Price (KSh)" class="variant-price" value="${price}" style="flex:1;">
     <button class="btn btn-danger btn-sm" type="button" onclick="this.parentElement.remove()">✕</button>
   `;
   container.appendChild(div);
 };
 
-window.addProduct = async function() {
+window.editProduct = function(index) {
+  const p = storeConfig.products[index];
+  if (!p) return;
+
+  getEl("editing-product-index").value = index;
+  getEl("product-form-title").innerText = `Edit Product: ${p.name}`;
+  getEl("prod-name").value = p.name || "";
+  getEl("prod-stock").value = p.inStock ? "true" : "false";
+
+  // Check Categories
+  const pCats = Array.isArray(p.categories) ? p.categories : [p.category];
+  document.querySelectorAll(".prod-cat-checkbox").forEach(cb => {
+    cb.checked = pCats.includes(cb.value);
+  });
+
+  // Load Variants
+  const container = getEl("variants-container");
+  container.innerHTML = "";
+  if (p.variants && p.variants.length > 0) {
+    p.variants.forEach(v => addVariantRow(v.size, v.price));
+  } else {
+    addVariantRow();
+  }
+
+  getEl("cancel-edit-btn").style.display = "inline-block";
+  getEl("save-product-btn").innerText = "Update Product";
+  getEl("prod-name").focus();
+};
+
+window.resetProductForm = function() {
+  getEl("editing-product-index").value = "-1";
+  getEl("product-form-title").innerText = "Add New Product";
+  getEl("prod-name").value = "";
+  getEl("prod-image").value = "";
+  document.querySelectorAll(".prod-cat-checkbox").forEach(cb => cb.checked = false);
+  
+  const container = getEl("variants-container");
+  container.innerHTML = "";
+  addVariantRow();
+
+  getEl("cancel-edit-btn").style.display = "none";
+  getEl("save-product-btn").innerText = "Save Product to Catalog";
+};
+
+window.saveProduct = async function() {
+  const editIndex = parseInt(getEl("editing-product-index").value, 10);
   const name = getEl("prod-name").value.trim();
   const inStock = getEl("prod-stock").value === "true";
   const fileInput = getEl("prod-image");
 
-  // Collect Multiple Selected Categories
   const checkedBoxes = document.querySelectorAll(".prod-cat-checkbox:checked");
   const categories = Array.from(checkedBoxes).map(cb => cb.value);
 
   if (!name) return alert("Product name is required.");
   if (categories.length === 0) return alert("Please select at least one category.");
 
-  // Parse Variants
   const sizeInputs = document.querySelectorAll(".variant-size");
   const priceInputs = document.querySelectorAll(".variant-price");
   const variants = [];
@@ -211,32 +256,30 @@ window.addProduct = async function() {
     if (size && price > 0) variants.push({ size, price });
   });
 
-  let image = "";
+  let image = editIndex > -1 ? (storeConfig.products[editIndex].image || "") : "";
   if (fileInput.files && fileInput.files[0]) {
     image = await compressImage(fileInput.files[0]);
   }
 
   storeConfig.products = storeConfig.products || [];
-  storeConfig.products.push({ name, categories, variants, inStock, image });
-  
-  // Clear Form
-  getEl("prod-name").value = "";
-  fileInput.value = "";
-  document.querySelectorAll(".prod-cat-checkbox").forEach(cb => cb.checked = false);
-  getEl("variants-container").innerHTML = `
-    <div class="variant-row">
-      <input type="text" placeholder="Size (e.g. 100ml)" class="variant-size" style="flex:1;">
-      <input type="number" placeholder="Price (KSh)" class="variant-price" style="flex:1;">
-      <button class="btn btn-danger btn-sm" type="button" onclick="this.parentElement.remove()">✕</button>
-    </div>
-  `;
-  
+
+  if (editIndex > -1) {
+    // Update existing product
+    storeConfig.products[editIndex] = { name, categories, variants, inStock, image };
+  } else {
+    // Add new product
+    storeConfig.products.push({ name, categories, variants, inStock, image });
+  }
+
+  resetProductForm();
   renderProducts();
 };
 
 window.deleteProduct = function(i) {
-  storeConfig.products.splice(i, 1);
-  renderProducts();
+  if (confirm("Are you sure you want to delete this product?")) {
+    storeConfig.products.splice(i, 1);
+    renderProducts();
+  }
 };
 
 window.saveStoreConfig = function() {
