@@ -1,3 +1,8 @@
+// ==========================================
+// AUDITED DASHBOARD CONTROLLER (REST + FULL SCHEMA)
+// Project ID: whatsapp-eco-engine-80882
+// ==========================================
+
 const PROJECT_ID = "whatsapp-eco-engine-80882";
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
@@ -5,13 +10,15 @@ let currentStoreId = "perfumescentre";
 let storeConfig = {
   storeName: "",
   whatsappNumber: "",
+  slogan: "",
+  logoUrl: "",
   categories: [],
   products: []
 };
 
 function getEl(id) { return document.getElementById(id); }
 
-// Navigation Banner Logic
+// Navigation Link Banner Fix
 function updateStoreLinkBanner(storeId) {
   const banner = getEl("store-link-banner");
   const urlText = getEl("store-url-text");
@@ -26,11 +33,12 @@ function updateStoreLinkBanner(storeId) {
   if (btn) {
     btn.href = storeRelativePath;
     btn.target = "_blank";
+    btn.rel = "noopener noreferrer";
   }
   banner.style.display = "flex";
 }
 
-// Canvas Base64 Compression to fit Firestore limits
+// Canvas Image Compression Helper (Fits within Firestore REST Limits)
 function compressImage(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -55,7 +63,7 @@ function compressImage(file) {
   });
 }
 
-// Firestore Converter Helpers
+// Firestore Schema Converters
 function toFirestore(val) {
   if (val === null || val === undefined) return { nullValue: null };
   if (typeof val === "boolean") return { booleanValue: val };
@@ -117,17 +125,18 @@ async function fetchFromCloud(storeId) {
   }
 }
 
+// UI Renderers
 function renderCategories() {
   const catList = getEl("category-list");
   const catSelect = getEl("product-category-select");
 
   if (catList) {
     catList.innerHTML = (storeConfig.categories || [])
-      .map((c, i) => `<li>${c} <button class="btn btn-danger" style="padding:2px 6px;" onclick="deleteCategory(${i})">✕</button></li>`)
+      .map((c, i) => `<li>${c} <button class="btn btn-danger btn-sm" onclick="deleteCategory(${i})">✕</button></li>`)
       .join("");
   }
   if (catSelect) {
-    catSelect.innerHTML = (storeConfig.categories || [])
+    catSelect.innerHTML = `<option value="">-- Select Category --</option>` + (storeConfig.categories || [])
       .map((c) => `<option value="${c}">${c}</option>`)
       .join("");
   }
@@ -138,18 +147,25 @@ function renderProducts() {
   if (!tbody) return;
 
   tbody.innerHTML = (storeConfig.products || [])
-    .map((p, i) => `
-      <tr>
-        <td><img src="${p.image || ''}" width="40" height="40" style="object-fit:cover; border-radius:4px;" /></td>
-        <td><strong>${p.name}</strong></td>
-        <td>${p.category || '-'}</td>
-        <td>KSh ${p.price || 0}</td>
-        <td><button class="btn btn-danger" onclick="deleteProduct(${i})">Delete</button></td>
-      </tr>
-    `).join("");
+    .map((p, i) => {
+      const variantStr = (p.variants || [])
+        .map(v => `${v.size}: KSh ${v.price}`)
+        .join(", ") || "No variants";
+
+      return `
+        <tr>
+          <td><img src="${p.image || ''}" width="40" height="40" style="object-fit:cover; border-radius:4px;" /></td>
+          <td><strong>${p.name}</strong></td>
+          <td>${p.category || '-'}</td>
+          <td>${variantStr}</td>
+          <td><span style="color:${p.inStock ? 'green' : 'red'}; font-weight:bold;">${p.inStock ? 'In Stock' : 'Out of Stock'}</span></td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteProduct(${i})">Delete</button></td>
+        </tr>
+      `;
+    }).join("");
 }
 
-// Global Operations
+// Exposed Window Functions for HTML Event Attributes
 window.addCategory = function() {
   const input = getEl("new-category-input");
   if (input && input.value.trim()) {
@@ -165,13 +181,39 @@ window.deleteCategory = function(i) {
   renderCategories();
 };
 
+window.addVariantRow = function() {
+  const container = getEl("variants-container");
+  if (!container) return;
+  const div = document.createElement("div");
+  div.className = "variant-row";
+  div.innerHTML = `
+    <input type="text" placeholder="Size (e.g. 100ml)" class="variant-size" style="flex:1;">
+    <input type="number" placeholder="Price (KSh)" class="variant-price" style="flex:1;">
+    <button class="btn btn-danger btn-sm" type="button" onclick="this.parentElement.remove()">✕</button>
+  `;
+  container.appendChild(div);
+};
+
 window.addProduct = async function() {
   const name = getEl("prod-name").value.trim();
   const category = getEl("product-category-select").value;
-  const price = parseFloat(getEl("prod-price").value) || 0;
+  const inStock = getEl("prod-stock").value === "true";
   const fileInput = getEl("prod-image");
 
   if (!name) return alert("Product name is required.");
+
+  // Parse Variants
+  const sizeInputs = document.querySelectorAll(".variant-size");
+  const priceInputs = document.querySelectorAll(".variant-price");
+  const variants = [];
+
+  sizeInputs.forEach((sInput, idx) => {
+    const size = sInput.value.trim();
+    const price = parseFloat(priceInputs[idx].value) || 0;
+    if (size && price > 0) {
+      variants.push({ size, price });
+    }
+  });
 
   let image = "";
   if (fileInput.files && fileInput.files[0]) {
@@ -179,11 +221,18 @@ window.addProduct = async function() {
   }
 
   storeConfig.products = storeConfig.products || [];
-  storeConfig.products.push({ name, category, price, image });
+  storeConfig.products.push({ name, category, variants, inStock, image });
   
+  // Clear Input Form
   getEl("prod-name").value = "";
-  getEl("prod-price").value = "";
   fileInput.value = "";
+  getEl("variants-container").innerHTML = `
+    <div class="variant-row">
+      <input type="text" placeholder="Size (e.g. 100ml)" class="variant-size" style="flex:1;">
+      <input type="number" placeholder="Price (KSh)" class="variant-price" style="flex:1;">
+      <button class="btn btn-danger btn-sm" type="button" onclick="this.parentElement.remove()">✕</button>
+    </div>
+  `;
   
   renderProducts();
 };
@@ -196,9 +245,12 @@ window.deleteProduct = function(i) {
 window.saveStoreConfig = function() {
   storeConfig.storeName = getEl("store-name-input").value;
   storeConfig.whatsappNumber = getEl("store-phone-input").value;
+  storeConfig.slogan = getEl("store-slogan-input").value;
+  storeConfig.logoUrl = getEl("store-logo-input").value;
   syncToCloud();
 };
 
+// DOM Initialization
 document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
   currentStoreId = params.get("store") || "perfumescentre";
@@ -210,6 +262,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     storeConfig = { ...storeConfig, ...cloudData };
     if (getEl("store-name-input")) getEl("store-name-input").value = storeConfig.storeName || "";
     if (getEl("store-phone-input")) getEl("store-phone-input").value = storeConfig.whatsappNumber || "";
+    if (getEl("store-slogan-input")) getEl("store-slogan-input").value = storeConfig.slogan || "";
+    if (getEl("store-logo-input")) getEl("store-logo-input").value = storeConfig.logoUrl || "";
   }
 
   renderCategories();
