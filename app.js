@@ -12,7 +12,7 @@
   const getEl = (id) => document.getElementById(id);
 
   function getItemPrice(item, variantIndex = 0) {
-    if (item.variants && item.variants.length > variantIndex) {
+    if (item.variants && item.variants[variantIndex]) {
       return Number(item.variants[variantIndex].price || 0);
     }
     return Number(item.price || 0);
@@ -23,11 +23,11 @@
 
     fetch(firestoreUrl)
       .then((res) => {
-        if (!res.ok) throw new Error("Store not found or network issue.");
+        if (!res.ok) throw new Error("Store database record not found.");
         return res.json();
       })
       .then((doc) => {
-        if (!doc || !doc.fields) throw new Error("Store document contains no valid fields.");
+        if (!doc || !doc.fields) throw new Error("Store fields are empty.");
 
         const fields = doc.fields;
         const rawItems = fields.items?.arrayValue?.values || [];
@@ -83,10 +83,10 @@
         updateCartUI();
       })
       .catch((err) => {
-        console.error("[STOREFRONT LOAD ERROR]:", err);
+        console.error("[STOREFRONT ERROR]:", err);
         const catalogGrid = getEl("catalog-grid");
         if (catalogGrid) {
-          catalogGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 40px;">Unable to load store "${storeId}". Please check connection or publish changes from dashboard.</p>`;
+          catalogGrid.innerHTML = `<p style="grid-column: 1/-1; text-align: center; color: #ef4444; padding: 40px;">Unable to load store "${storeId}". Open the dashboard, add items, and click "Publish All Changes".</p>`;
         }
       });
   }
@@ -283,9 +283,7 @@
     if (cart.length === 0) return alert("Your cart is empty!");
 
     const phone = storeData?.phone || "";
-    if (!phone) {
-      return alert("Store phone number is missing in dashboard settings.");
-    }
+    if (!phone) return alert("Store phone number is missing in dashboard settings.");
 
     let message = `🛒 *NEW ORDER - ${storeData?.slogan || "Store"}*\n\n`;
     let grandTotal = 0;
