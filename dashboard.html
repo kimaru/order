@@ -3,89 +3,131 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Store Dashboard</title>
+  <title>Merchant Dashboard - Store Engine</title>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 20px; background: #f8f9fa; color: #333; }
-    .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-    .banner { display: flex; align-items: center; justify-content: space-between; background: #eef2f7; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px; }
-    .btn { background: #007bff; color: white; padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; text-decoration: none; font-weight: bold; }
-    .btn:hover { background: #0056b3; }
-    .btn-success { background: #28a745; }
-    .btn-danger { background: #dc3545; }
-    .form-group { margin-bottom: 15px; }
-    label { display: block; font-weight: bold; margin-bottom: 5px; }
-    input, select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-    th { background: #f1f1f1; }
+    :root { --primary-color: #007bff; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 20px; background: #f4f6f8; color: #333; }
+    .container { max-width: 960px; margin: 0 auto; background: #ffffff; padding: 24px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+    .banner { display: flex; align-items: center; justify-content: space-between; background: #eef4fc; border: 1px solid #cce0ff; padding: 14px 18px; border-radius: 8px; margin-bottom: 24px; flex-wrap: wrap; gap: 10px; }
+    .btn { background: var(--primary-color); color: #fff; padding: 9px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; text-decoration: none; display: inline-block; }
+    .btn:hover { opacity: 0.9; }
+    .btn-success { background: #25D366; color: #fff; }
+    .btn-danger { background: #dc3545; color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 13px; }
+    fieldset { border: 1px solid #e1e4e8; padding: 20px; border-radius: 8px; margin-bottom: 24px; background: #fafbfc; }
+    legend { font-weight: 700; font-size: 1.1em; padding: 0 8px; color: #24292e; }
+    .form-group { margin-bottom: 16px; }
+    .form-row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .form-col { flex: 1; min-width: 200px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+    input[type="text"], input[type="number"], select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #d1d5da; border-radius: 6px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; background: #fff; }
+    th, td { border: 1px solid #e1e4e8; padding: 10px; text-align: left; font-size: 14px; }
+    th { background: #f6f8fa; font-weight: 600; }
+    .variant-row { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
   </style>
-  <script src="dashboard.js?v=200" defer></script>
+  <script src="dashboard.js?v=300" defer></script>
 </head>
 <body>
   <div class="container">
-    <h2>Merchant Dashboard</h2>
+    <h2>Merchant Management Dashboard</h2>
     
-    <!-- Store Banner -->
+    <!-- Dynamic Store Link Banner -->
     <div id="store-link-banner" class="banner" style="display:none;">
       <div>
-        <strong>Storefront URL:</strong> <span id="store-url-text" style="font-family: monospace;">Loading...</span>
+        <strong>Live Storefront URL:</strong><br>
+        <span id="store-url-text" style="font-family: monospace; font-size: 13px;">Loading...</span>
       </div>
       <a id="visit-store-btn" class="btn btn-success" href="#" target="_blank">Visit Store ↗</a>
     </div>
 
-    <!-- Store Settings -->
-    <fieldset style="border:1px solid #ccc; padding: 15px; border-radius:6px; margin-bottom:20px;">
-      <legend><strong>Store Settings</strong></legend>
-      <div class="form-group">
-        <label for="store-name-input">Store Name</label>
-        <input type="text" id="store-name-input" placeholder="e.g. Aromatic Vibes">
+    <!-- Store Branding & Contact Settings -->
+    <fieldset>
+      <legend>Store Identity & Contact</legend>
+      <div class="form-row">
+        <div class="form-col form-group">
+          <label for="store-name-input">Store Name</label>
+          <input type="text" id="store-name-input" placeholder="e.g. Aromatic Vibes">
+        </div>
+        <div class="form-col form-group">
+          <label for="store-phone-input">WhatsApp Order Phone (with country code)</label>
+          <input type="text" id="store-phone-input" placeholder="e.g. 254700000000">
+        </div>
       </div>
-      <div class="form-group">
-        <label for="store-phone-input">WhatsApp Phone Number (with Country Code)</label>
-        <input type="text" id="store-phone-input" placeholder="e.g. 254700000000">
+      <div class="form-row">
+        <div class="form-col form-group">
+          <label for="store-slogan-input">Store Slogan / Tagline</label>
+          <input type="text" id="store-slogan-input" placeholder="e.g. Luxury Fragrances Delivered">
+        </div>
+        <div class="form-col form-group">
+          <label for="store-logo-input">Logo Image URL (Optional)</label>
+          <input type="text" id="store-logo-input" placeholder="https://example.com/logo.png">
+        </div>
       </div>
       <button class="btn btn-success" onclick="saveStoreConfig()">Publish Store Settings</button>
     </fieldset>
 
-    <!-- Category Management -->
-    <fieldset style="border:1px solid #ccc; padding: 15px; border-radius:6px; margin-bottom:20px;">
-      <legend><strong>Categories</strong></legend>
-      <div style="display:flex; gap:10px;">
-        <input type="text" id="new-category-input" placeholder="New Category Name">
+    <!-- Consolidated Category Manager -->
+    <fieldset>
+      <legend>Category Management</legend>
+      <div style="display:flex; gap:10px; max-width:500px;">
+        <input type="text" id="new-category-input" placeholder="e.g. Perfumes, Deodorants, Oils">
         <button class="btn" onclick="addCategory()">Add Category</button>
       </div>
-      <ul id="category-list" style="margin-top:10px; padding-left:20px;"></ul>
+      <ul id="category-list" style="margin-top:14px; padding-left:20px;"></ul>
     </fieldset>
 
-    <!-- Product Management -->
-    <fieldset style="border:1px solid #ccc; padding: 15px; border-radius:6px;">
-      <legend><strong>Add Product</strong></legend>
-      <div class="form-group">
-        <label for="prod-name">Product Name</label>
-        <input type="text" id="prod-name">
+    <!-- Product Catalog Editor -->
+    <fieldset>
+      <legend>Product Catalog</legend>
+      <div class="form-row">
+        <div class="form-col form-group">
+          <label for="prod-name">Product Name *</label>
+          <input type="text" id="prod-name" placeholder="e.g. Amber Oud EDP">
+        </div>
+        <div class="form-col form-group">
+          <label for="product-category-select">Category</label>
+          <select id="product-category-select"><option value="">-- Select Category --</option></select>
+        </div>
       </div>
-      <div class="form-group">
-        <label for="product-category-select">Category</label>
-        <select id="product-category-select"></select>
-      </div>
-      <div class="form-group">
-        <label for="prod-price">Price (KSh)</label>
-        <input type="number" id="prod-price" placeholder="0">
-      </div>
-      <div class="form-group">
-        <label for="prod-image">Image</label>
-        <input type="file" id="prod-image" accept="image/*">
-      </div>
-      <button class="btn" onclick="addProduct()">Add Product</button>
 
-      <h3>Product Catalog</h3>
+      <div class="form-group">
+        <label>Size / Price Variants (e.g. 50ml -> KSh 2500, 100ml -> KSh 4000)</label>
+        <div id="variants-container">
+          <div class="variant-row">
+            <input type="text" placeholder="Size (e.g. 100ml)" class="variant-size" style="flex:1;">
+            <input type="number" placeholder="Price (KSh)" class="variant-price" style="flex:1;">
+            <button class="btn btn-danger btn-sm" type="button" onclick="this.parentElement.remove()">✕</button>
+          </div>
+        </div>
+        <button class="btn btn-sm" type="button" onclick="addVariantRow()" style="margin-top:6px;">+ Add Size Option</button>
+      </div>
+
+      <div class="form-row">
+        <div class="form-col form-group">
+          <label for="prod-stock">Stock Availability</label>
+          <select id="prod-stock">
+            <option value="true">In Stock</option>
+            <option value="false">Out of Stock</option>
+          </select>
+        </div>
+        <div class="form-col form-group">
+          <label for="prod-image">Product Image File</label>
+          <input type="file" id="prod-image" accept="image/*">
+        </div>
+      </div>
+
+      <button class="btn" onclick="addProduct()">Save Product to Catalog</button>
+
+      <h3 style="margin-top:24px;">Current Products</h3>
       <table>
         <thead>
           <tr>
             <th>Image</th>
             <th>Name</th>
             <th>Category</th>
-            <th>Price</th>
+            <th>Variants / Pricing</th>
+            <th>Status</th>
             <th>Action</th>
           </tr>
         </thead>
