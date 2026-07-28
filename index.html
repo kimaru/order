@@ -5,101 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Storefront</title>
   <style>
-    :root { --accent-color: #10b981; }
+    :root { --primary-color: #10b981; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
     body { background-color: #f8fafc; color: #0f172a; padding-bottom: 80px; }
-
-    header { background: white; border-bottom: 1px solid #e2e8f0; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; sticky: top; top: 0; z-index: 10; }
-    .brand-container { display: flex; align-items: center; gap: 12px; }
-    .brand-logo { width: 42px; height: 42px; border-radius: 8px; object-fit: cover; }
-    .brand-title { font-size: 18px; font-weight: 700; text-transform: capitalize; }
-    .brand-slogan { font-size: 12px; color: #64748b; }
-
-    .cart-btn { background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px; }
-
-    /* Category Filter Chips */
-    .categories-bar { display: flex; gap: 8px; overflow-x: auto; padding: 16px 20px 4px 20px; scrollbar-width: none; }
-    .categories-bar::-webkit-scrollbar { display: none; }
-    .chip { background: white; border: 1px solid #cbd5e1; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; color: #475569; cursor: pointer; white-space: nowrap; }
-    .chip.active { background: var(--accent-color); color: white; border-color: var(--accent-color); }
-
-    /* Product Grid */
-    .container { max-width: 1000px; margin: 20px auto; padding: 0 20px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-    .product-card { background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    header { background: #ffffff; border-bottom: 1px solid #e2e8f0; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; sticky: top; }
+    .logo-box { display: flex; align-items: center; gap: 12px; }
+    .logo-box img { height: 40px; width: 40px; object-fit: cover; border-radius: 8px; }
+    .cat-nav { display: flex; gap: 8px; overflow-x: auto; padding: 12px 20px; background: #ffffff; border-bottom: 1px solid #f1f5f9; }
+    .cat-filter-btn { padding: 6px 14px; border-radius: 20px; border: 1px solid #cbd5e1; background: #ffffff; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; }
+    .cat-filter-btn.active { background: var(--primary-color); color: #ffffff; border-color: var(--primary-color); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; padding: 20px; max-width: 1100px; margin: 0 auto; }
+    .product-card { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
     .product-img { width: 100%; height: 180px; object-fit: cover; background: #f1f5f9; }
-    .product-details { padding: 12px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
-    .product-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
-    .product-price { font-size: 15px; font-weight: 700; color: var(--accent-color); margin-bottom: 10px; }
-
-    .stock-tag { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
-    .stock-instock { background: #dcfce7; color: #166534; }
-    .stock-lowstock { background: #fef9c3; color: #854d0e; }
-    .stock-outofstock { background: #fee2e2; color: #991b1b; }
-
-    .add-to-cart-btn { background: var(--accent-color); color: white; border: none; padding: 8px; border-radius: 6px; font-weight: 600; cursor: pointer; width: 100%; font-size: 13px; }
-    .add-to-cart-btn:disabled { background: #cbd5e1; cursor: not-allowed; }
-
-    /* Cart Drawer */
-    .cart-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; z-index: 20; }
-    .cart-drawer { position: fixed; top: 0; right: -400px; width: 100%; max-width: 380px; height: 100%; background: white; z-index: 30; transition: right 0.3s ease; display: flex; flex-direction: column; padding: 20px; }
-    .cart-drawer.open { right: 0; }
-
-    .cart-item-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
-    .qty-controls { display: flex; align-items: center; gap: 8px; }
-    .qty-btn { width: 24px; height: 24px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 4px; cursor: pointer; font-weight: 700; }
-    
-    .input-field { width: 100%; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 13px; margin-top: 4px; margin-bottom: 8px; }
+    .product-details { padding: 12px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+    .cart-btn-fixed { position: fixed; bottom: 20px; right: 20px; background: var(--primary-color); color: #ffffff; padding: 12px 20px; border-radius: 30px; border: none; font-weight: 700; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); display: flex; align-items: center; gap: 8px; }
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); align-items: center; justify-content: center; z-index: 100; }
+    .modal-content { background: #ffffff; width: 90%; max-width: 450px; border-radius: 12px; padding: 20px; max-height: 80vh; display: flex; flex-direction: column; }
   </style>
 </head>
 <body>
 
   <header>
-    <div class="brand-container">
-      <img id="brand-logo" class="brand-logo" src="" alt="Logo" style="display: none;">
+    <div class="logo-box">
+      <img id="store-logo" src="https://placehold.co/100x100?text=Logo" alt="Logo">
       <div>
-        <div id="brand-name" class="brand-title">Loading Store...</div>
-        <div id="brand-slogan" class="brand-slogan"></div>
+        <h2 style="font-size: 16px; font-weight: 700;">Storefront</h2>
+        <p id="store-slogan" style="font-size: 12px; color: #64748b;">Loading store...</p>
       </div>
     </div>
-    <button id="open-cart-btn" class="cart-btn">
-      🛒 Cart (<span id="cart-badge">0</span>)
-    </button>
   </header>
 
-  <!-- Categories Filter -->
-  <div id="categories-bar" class="categories-bar"></div>
+  <!-- Categories Filter Bar -->
+  <div id="category-nav" class="cat-nav"></div>
 
-  <div class="container">
-    <div id="product-grid" class="grid"></div>
-  </div>
+  <!-- Products Catalog Grid -->
+  <div id="catalog-grid" class="grid"></div>
 
-  <!-- Cart Drawer -->
-  <div id="cart-overlay" class="cart-overlay"></div>
-  <div id="cart-drawer" class="cart-drawer">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-      <h2 style="font-size: 18px;">Shopping Cart</h2>
-      <button id="close-cart-btn" style="background: none; border: none; font-size: 20px; cursor: pointer;">✕</button>
-    </div>
+  <!-- Floating Cart Trigger Button -->
+  <button id="open-cart-btn" class="cart-btn-fixed">
+    🛒 Cart (<span id="cart-count">0</span>)
+  </button>
 
-    <div id="cart-items-container" style="flex-grow: 1; overflow-y: auto;"></div>
-
-    <!-- Delivery Form & Checkout -->
-    <div style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: 10px;">
-      <label style="font-size: 12px; font-weight: 600;">Full Name *</label>
-      <input type="text" id="cust-name" class="input-field" placeholder="Jane Doe">
-
-      <label style="font-size: 12px; font-weight: 600;">Delivery Address *</label>
-      <input type="text" id="cust-address" class="input-field" placeholder="Building, Street, Town">
-
-      <div style="margin: 10px 0; font-size: 15px; font-weight: 700; display: flex; justify-content: space-between;">
-        <span>Total:</span>
-        <span id="cart-total" style="color: var(--accent-color);">KSh 0</span>
+  <!-- Cart Modal -->
+  <div id="cart-modal" class="modal-overlay">
+    <div class="modal-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h3 style="font-size: 16px; font-weight: 700;">Your Shopping Cart</h3>
+        <button id="close-cart-btn" style="background: none; border: none; font-size: 18px; cursor: pointer;">✕</button>
       </div>
+      
+      <div id="cart-items-container" style="flex: 1; overflow-y: auto; margin-bottom: 16px;"></div>
 
-      <button id="whatsapp-checkout-btn" style="width: 100%; background: #25d366; color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 14px; cursor: pointer;">
-        💬 Order via WhatsApp
-      </button>
+      <div style="border-top: 1px solid #e2e8f0; padding-top: 12px; margin-top: auto;">
+        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 16px; margin-bottom: 12px;">
+          <span>Total:</span>
+          <span id="cart-total-price">KSh 0</span>
+        </div>
+        <button id="checkout-whatsapp-btn" style="width: 100%; background: #25d366; color: #ffffff; border: none; padding: 12px; border-radius: 8px; font-weight: 700; cursor: pointer; font-size: 14px;">
+          📲 Order via WhatsApp
+        </button>
+      </div>
     </div>
   </div>
 
