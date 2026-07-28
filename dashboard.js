@@ -1,18 +1,29 @@
 // ==========================================
 // STORE DASHBOARD LOGIC (GitHub Pages Compatible)
-// Project: whatsapp-eco-engine-80882
+// Repository: https://kimaru.github.io/order/
+// Project ID: whatsapp-eco-engine-80882
 // ==========================================
 
 const PROJECT_ID = "whatsapp-eco-engine-80882";
 const FIRESTORE_BASE_URL = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
 
-// Helper: Get element by ID safely
+// Global State
+let currentStoreId = "perfumescentre";
+let storeConfig = {
+  storeName: "",
+  whatsappNumber: "",
+  categories: [],
+  sizeVariants: [],
+  products: []
+};
+
+// Helper: DOM Element selector
 function getEl(id) {
   return document.getElementById(id);
 }
 
 // ------------------------------------------
-// 1. UPDATE STORE LINK BANNER
+// 1. LINK BANNER MANAGEMENT
 // ------------------------------------------
 function updateStoreLinkBanner(storeId) {
   const storeLinkBanner = getEl("store-link-banner");
@@ -24,10 +35,10 @@ function updateStoreLinkBanner(storeId) {
     return;
   }
 
-  // Relative path ensures navigation stays within /order/ on GitHub Pages
+  // Pure relative link ensures GitHub Pages subfolder (/order/) is preserved
   const storeRelativePath = `index.html?store=${encodeURIComponent(storeId)}`;
 
-  // Construct absolute URL display for copying
+  // Construct absolute URL for display/copying
   const currentBasePath = window.location.pathname.replace(/dashboard\.html$/i, "");
   const fullStoreUrl = `${window.location.origin}${currentBasePath}${storeRelativePath}`;
 
@@ -136,16 +147,19 @@ function parseFirestoreValue(valObj) {
 }
 
 // ------------------------------------------
-// 4. FIRESTORE SYNC & FETCH
+// 4. CLOUD SYNC & FETCH
 // ------------------------------------------
-async function syncToCloud(storeId, storeData) {
+async function syncToCloud() {
+  const syncBtn = getEl("sync-btn");
+  if (syncBtn) syncBtn.innerText = "Syncing...";
+
   try {
     const fields = {};
-    for (const [key, val] of Object.entries(storeData)) {
+    for (const [key, val] of Object.entries(storeConfig)) {
       fields[key] = convertToFirestoreValue(val);
     }
 
-    const response = await fetch(`${FIRESTORE_BASE_URL}/stores/${storeId}`, {
+    const response = await fetch(`${FIRESTORE_BASE_URL}/stores/${currentStoreId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fields }),
@@ -153,12 +167,15 @@ async function syncToCloud(storeId, storeData) {
 
     if (!response.ok) {
       const errData = await response.json();
-      throw new Error(`Cloud Sync Failed: ${errData.error?.message || response.statusText}`);
+      throw new Error(errData.error?.message || response.statusText);
     }
-    console.log(`Successfully synced store: ${storeId}`);
+    
+    alert("Store config successfully published to live site!");
   } catch (error) {
     console.error("syncToCloud Error:", error);
-    alert(`Sync Warning: ${error.message}`);
+    alert(`Sync Error: ${error.message}`);
+  } finally {
+    if (syncBtn) syncBtn.innerText = "Publish Changes";
   }
 }
 
@@ -167,7 +184,7 @@ async function fetchFromCloud(storeId) {
     const response = await fetch(`${FIRESTORE_BASE_URL}/stores/${storeId}`);
     if (!response.ok) {
       if (response.status === 404) return null;
-      throw new Error(`Cloud Fetch Failed: ${response.statusText}`);
+      throw new Error(`Fetch failed: ${response.statusText}`);
     }
     const doc = await response.json();
     const data = {};
@@ -184,18 +201,97 @@ async function fetchFromCloud(storeId) {
 }
 
 // ------------------------------------------
-// 5. INITIALIZATION
+// 5. DASHBOARD UI & RENDERERS
+// ------------------------------------------
+function renderCategories() {
+  const catList = getEl("category-list");
+  const catSelect = getEl("product-category-select");
+
+  if (catList) {
+    catList.innerHTML = (storeConfig.categories || [])
+      .map((c, i) => `<li>${c} <button onclick="deleteCategory(${i})">✕</button></li>`)
+      .join("");
+  }
+
+  if (catSelect) {
+    catSelect.innerHTML = (storeConfig.categories || [])
+      .map((c) => `<option value="${c}">${c}</option>`)
+      .join("");
+  }
+}
+
+function renderProducts() {
+  const prodTable = getEl("products-table-body");
+  if (!prodTable) return;
+
+  prodTable.innerHTML = (storeConfig.products || [])
+    .map(
+      (p, i) => `
+    <tr>
+      <td><img src="${p.image || ''}" width="40" height="40" style="object-fit:cover;" /></td>
+      <td><strong>${p.name}</strong></td>
+      <td>${p.category || '-'}</td>
+      <td>${p.price ? 'KSh ' + p.price : 'Variants'}</td>
+      <td><button onclick="deleteProduct(${i})">Delete</button></td>
+    </tr>
+  `
+    )
+    .join("");
+}
+
+// Exposed Functions for Inline HTML Attributes (onclick)
+window.addCategory = function () {
+  const input = getEl("new-category-input");
+  if (input && input.value.trim()) {
+    storeConfig.categories = storeConfig.categories || [];
+    storeConfig.categories.push(input.value.trim());
+    input.value = "";
+    renderCategories();
+  }
+};
+
+window.deleteCategory = function (index) {
+  storeConfig.categories.splice(index, 1);
+  renderCategories();
+};
+
+window.deleteProduct = function (index) {
+  if (confirm("Are you sure you want to delete this product?")) {
+    storeConfig.products.splice(index, 1);
+    renderProducts();
+  }
+};
+
+window.saveStoreConfig = function () {
+  const nameInput = getEl("store-name-input");
+  const phoneInput = getEl("store-phone-input");
+
+  if (nameInput) storeConfig.storeName = nameInput.value;
+  if (phoneInput) storeConfig.whatsappNumber = phoneInput.value;
+
+  syncToCloud();
+};
+
+// ------------------------------------------
+// 6. INITIALIZATION ON LOAD
 // ------------------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const currentStoreId = urlParams.get("store") || "perfumescentre";
+  currentStoreId = urlParams.get("store") || "perfumescentre";
 
-  // Update URL Banner on initialization
+  // 1. Update Navigation Link immediately
   updateStoreLinkBanner(currentStoreId);
 
-  // Fetch current store config from Firestore
+  // 2. Load Firestore Data
   const cloudData = await fetchFromCloud(currentStoreId);
   if (cloudData) {
-    console.log("Store loaded from cloud:", cloudData);
+    storeConfig = { ...storeConfig, ...cloudData };
+    
+    // Populate form fields if present
+    if (getEl("store-name-input")) getEl("store-name-input").value = storeConfig.storeName || "";
+    if (getEl("store-phone-input")) getEl("store-phone-input").value = storeConfig.whatsappNumber || "";
+
+    renderCategories();
+    renderProducts();
   }
 });
